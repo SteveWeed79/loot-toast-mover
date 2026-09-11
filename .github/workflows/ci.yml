@@ -13,7 +13,7 @@ jobs:
     name: Lint and test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # WoW runs Lua 5.1, so lint and test against the same version.
       - name: Install Lua 5.1 and luacheck
