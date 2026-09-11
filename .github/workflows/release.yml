@@ -1,0 +1,43 @@
+name: Release
+
+# Publishes to CurseForge (project 1262382) and attaches the zip to a GitHub release.
+# Triggered by pushing a version tag:
+#
+#   git tag -a v4.8.4 -m "4.8.4" && git push origin v4.8.4
+#
+# Requires a repository secret named CF_API_KEY holding a CurseForge API token
+# (Settings -> Secrets and variables -> Actions). The CurseForge project id lives in
+# LootToastMover.toc as X-Curse-Project-ID, so the packager needs no extra arguments.
+
+on:
+  push:
+    tags:
+      - "v*"
+  # Allows a re-run from the Actions tab if an upload fails partway.
+  workflow_dispatch:
+
+permissions:
+  contents: write # the packager creates the GitHub release and uploads the zip
+
+jobs:
+  release:
+    name: Package and publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone project
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history, so the packager can build the changelog
+
+      # Don't ship a tag that fails its own tests.
+      - name: Install Lua 5.1
+        run: sudo apt-get update && sudo apt-get install -y lua5.1
+
+      - name: Tests
+        run: lua5.1 tests/run_tests.lua
+
+      - name: Package and release
+        uses: BigWigsMods/packager@v2
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}

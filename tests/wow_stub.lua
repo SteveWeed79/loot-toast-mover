@@ -42,7 +42,8 @@ function Frame:GetScript(k) return self._scripts and self._scripts[k] end
 function Frame:RegisterEvent(e) self._events = self._events or {}; self._events[e] = true end
 function Frame:UnregisterEvent(e) if self._events then self._events[e] = nil end end
 function Frame:IsEventRegistered(e) return (self._events and self._events[e]) and true or false end
-function Frame:CreateFontString() return setmetatable({}, Frame) end
+-- Assigned rather than declared with `:` so the unused self argument stays implicit.
+Frame.CreateFontString = function() return setmetatable({}, Frame) end
 function Frame:StartMoving() self._moving = true end
 function Frame:StopMovingOrSizing() self._moving = false end
 

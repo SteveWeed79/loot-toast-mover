@@ -11,7 +11,7 @@ local print = stub.stdout -- the stub replaces the global print to capture addon
 
 -- Override to run the suite against a different copy of the addon, e.g. to confirm these
 -- tests really do fail against an older revision.
-local ADDON_DIR = os.getenv("LTM_ADDON_DIR") or (here .. "/../LootToastMover")
+local ADDON_DIR = os.getenv("LTM_ADDON_DIR") or (here .. "/..")
 
 local passed, failed = 0, 0
 
@@ -64,18 +64,20 @@ local function loadAddon(opts)
     if opts.savedVars then _G.LootToastMoverDB = opts.savedVars end
 
     for _, rel in ipairs(tocFiles()) do
-        if rel:find("^Libs/") and opts.withLibs == false then
-            -- skip: simulating the libraries not being installed
-        elseif rel:find("LibDBIcon") then
-            -- The real LibDBIcon needs far more of the widget API than this stub models,
-            -- so substitute the stand-in that reproduces its registration contract.
-            if _G.LibStub then stub.installDBIcon() end
-        else
-            local chunk, loadErr = loadfile(ADDON_DIR .. "/" .. rel)
-            if not chunk then return nil, loadErr end
-            -- WoW passes the addon's name as each file's vararg.
-            local ok, err = pcall(chunk, "LootToastMover")
-            if not ok then return nil, err end
+        -- withLibs = false simulates the libraries not being installed at all.
+        local skip = rel:find("^Libs/") and opts.withLibs == false
+        if not skip then
+            if rel:find("LibDBIcon") then
+                -- The real LibDBIcon needs far more of the widget API than this stub
+                -- models, so substitute the stand-in that reproduces its contract.
+                if _G.LibStub then stub.installDBIcon() end
+            else
+                local chunk, loadErr = loadfile(ADDON_DIR .. "/" .. rel)
+                if not chunk then return nil, loadErr end
+                -- WoW passes the addon's name as each file's vararg.
+                local ok, err = pcall(chunk, "LootToastMover")
+                if not ok then return nil, err end
+            end
         end
     end
 
