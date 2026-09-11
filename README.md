@@ -41,7 +41,19 @@ registers a broker object; left-clicking it toggles the anchor box.
 
 ## Saved variables
 
-`LootToastMoverDB` stores the anchor's screen position account-wide.
+`LootToastMoverDB` is account-wide and holds the anchor's screen position, plus a
+`minimap` sub-table owned by LibDBIcon for the minimap button's angle and hidden state.
+`/loottoastpos reset` clears the position keys and leaves the minimap settings alone.
+
+## Development
+
+Regression tests run outside the game against a stubbed WoW API:
+
+```sh
+lua5.1 tests/run_tests.lua
+```
+
+See [tests/README.md](tests/README.md).
 
 ## Bundled libraries
 
