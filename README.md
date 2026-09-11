@@ -44,8 +44,8 @@ button, which you can drag around the minimap — that position is remembered to
 
 ## Compatibility
 
-Targets Interface `120100` (patch 12.1, Midnight). A 12.x client refuses to load addons
-whose interface number is below `120000`, so this has to be kept current; check the live
+Targets Interface `120100` (patch 12.1, Midnight). Patch 12.0 raised the floor for mainline
+addons to `120000`, so this has to be kept current; check the live
 value in-game with `/dump select(4, GetBuildInfo())`.
 
 ## Saved variables

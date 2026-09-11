@@ -9,7 +9,9 @@ local here = (arg and arg[0] or "tests/check_toc.lua"):match("^(.*)[/\\][^/\\]*$
 local ROOT = os.getenv("LTM_ADDON_DIR") or (here .. "/..")
 local TOC = ROOT .. "/LootToastMover.toc"
 
--- Addons below this are refused outright by a 12.x client.
+-- Patch 12.0 raised the floor for mainline addons to 120000. Sources disagree on whether
+-- a lower number is merely flagged out of date or refused outright, but either way an
+-- addon below this does not load for a normal user.
 local MIN_INTERFACE = 120000
 
 local problems = {}
@@ -40,8 +42,8 @@ local interface = tonumber((directives.Interface or ""):match("^%s*(%d+)"))
 if not interface then
     fail("## Interface is not a number: " .. tostring(directives.Interface))
 elseif interface < MIN_INTERFACE then
-    fail(("## Interface %d is below %d; a 12.x client will not load the addon")
-        :format(interface, MIN_INTERFACE))
+    fail(("## Interface %d is below the %d floor for patch 12.x; the client will not load "
+        .. "the addon for a normal user"):format(interface, MIN_INTERFACE))
 end
 
 -- The in-file version banner should track ## Version, since they drifted apart before.
