@@ -32,6 +32,10 @@ function Frame:GetPoint()
     return pt[1], pt[2], pt[3], pt[4], pt[5]
 end
 function Frame:ClearAllPoints() self._point = nil end
+function Frame:SetSize(w, h) self._w, self._h = w, h end
+function Frame:GetSize() return self._w or 0, self._h or 0 end
+function Frame:GetWidth() return self._w or 0 end
+function Frame:GetHeight() return self._h or 0 end
 function Frame:SetShown(s) self._shown = s and true or false end
 function Frame:IsShown() return self._shown and true or false end
 function Frame:Show() self._shown = true end
@@ -120,6 +124,39 @@ function M.reset()
             if not t.cancelled and not t.iters then n = n + 1 end
         end
         return n
+    end
+
+    -- Blizzard's loot alert system. AddAlert calls are captured so tests can assert that a
+    -- sample toast was fired and with what.
+    _G.LootAlertSystem = {
+        alerts = {},
+        AddAlert = function(self, link, quantity)
+            table.insert(self.alerts, { link = link, quantity = quantity })
+            return true
+        end,
+    }
+
+    -- ItemMixin. Item data is deliberately NOT available synchronously, mirroring an uncached
+    -- item on a real client: the callback only runs once FlushItemLoads() is called.
+    _G.PENDING_ITEM_LOADS = {}
+    _G.Item = {
+        CreateFromItemID = function(_, itemID)
+            return {
+                itemID = itemID,
+                ContinueOnItemLoad = function(_, callback)
+                    table.insert(_G.PENDING_ITEM_LOADS, callback)
+                end,
+                GetItemLink = function(self)
+                    return ("|cffffffff|Hitem:%d::::::::80:::::|h[Sample Item]|h|r"):format(self.itemID)
+                end,
+            }
+        end,
+    }
+    _G.FlushItemLoads = function()
+        local queued = _G.PENDING_ITEM_LOADS
+        _G.PENDING_ITEM_LOADS = {}
+        for _, callback in ipairs(queued) do callback() end
+        return #queued
     end
 
     _G.IsLoggedIn = function() return true end

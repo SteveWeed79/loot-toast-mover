@@ -89,11 +89,41 @@ elseif seenLib and files[addonIndex + 1] and files[addonIndex + 1]:find("^Libs/"
     fail("LootToastMover.lua is listed before a library; LibStub would still be nil")
 end
 
+-- The packager falls back to a changelog generated from raw commit messages when the
+-- manual-changelog file cannot be found, and says nothing about it. Check the file named
+-- in .pkgmeta really is there, and that it actually mentions the version being shipped.
+local pkgmeta = io.open(ROOT .. "/.pkgmeta")
+if not pkgmeta then
+    fail(".pkgmeta is missing")
+else
+    local meta = pkgmeta:read("*a")
+    pkgmeta:close()
+    -- Only the filename is needed, from either the plain or the extended form.
+    local changelog = meta:match("manual%-changelog:%s*\n%s*filename:%s*([^%s\n]+)")
+        or meta:match("manual%-changelog:%s*([^%s\n]+)")
+    if not changelog then
+        fail(".pkgmeta has no manual-changelog, so CurseForge gets raw commit messages")
+    else
+        local changelogFile = io.open(ROOT .. "/" .. changelog)
+        if not changelogFile then
+            fail(("`.pkgmeta` names %s as the changelog but it does not exist; the "
+                .. "packager would silently publish commit messages instead"):format(changelog))
+        else
+            local text = changelogFile:read("*a")
+            changelogFile:close()
+            local version = directives.Version or ""
+            if version ~= "" and not text:find(version, 1, true) then
+                fail(("%s has no entry for version %s"):format(changelog, version))
+            end
+        end
+    end
+end
+
 if #problems > 0 then
-    print(("%d problem(s) in LootToastMover.toc:"):format(#problems))
+    print(("%d problem(s) found:"):format(#problems))
     for _, p in ipairs(problems) do print("  - " .. p) end
     os.exit(1)
 end
 
-print(("LootToastMover.toc ok (Interface %d, version %s, %d files)")
+print(("LootToastMover.toc ok (Interface %d, version %s, %d files, changelog present)")
     :format(interface, directives.Version, #files))

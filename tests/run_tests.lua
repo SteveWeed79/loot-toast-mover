@@ -221,5 +221,101 @@ test("Alerts stay on the anchor after Blizzard re-anchors", function()
 end)
 
 ------------------------------------------------------------------------------------------
+-- The box is meant to be the toast's real footprint, so that dragging it shows exactly
+-- where toasts land. Alerts anchor BOTTOM-to-BOTTOM with AlertFrame and stack upward, so
+-- AlertFrame's bottom edge has to sit on the box's bottom edge with no fudge offset.
+test("Anchor box is the toast footprint", function()
+    local anchor = mustLoad()
+    check(anchor:GetWidth() == 276 and anchor:GetHeight() == 96,
+          "anchor box matches LootWonAlertFrameTemplate's 276x96")
+
+    local point, rel, relPoint, x, y = AlertFrame:GetPoint()
+    check(point == "BOTTOM" and relPoint == "BOTTOM", "AlertFrame is pinned bottom-to-bottom")
+    check(rel == anchor, "AlertFrame is pinned to the anchor box")
+    check(x == 0 and y == 0, "no magic offset between the box and the toast")
+end)
+
+------------------------------------------------------------------------------------------
+-- /loottoastpos test fires a real toast through Blizzard's alert system. GetItemInfo
+-- returns nil for an uncached item and LootWonAlertFrame_SetUp passes that nil into its
+-- Azerite and Conduit checks, so the alert must wait for the item data to load.
+test("Sample toast", function()
+    mustLoad()
+    SlashCmdList.LOOTTOASTPOS("test")
+    check(#LootAlertSystem.alerts == 0, "nothing is fired before the item data resolves")
+    check(#_G.PENDING_ITEM_LOADS == 1, "the item load is pending")
+
+    FlushItemLoads()
+    check(#LootAlertSystem.alerts == 1, "one toast is fired once the item loads")
+    local alert = LootAlertSystem.alerts[1]
+    check(type(alert.link) == "string" and alert.link:find("Hitem:", 1, true) ~= nil,
+          "the toast is given a real item link, not nil")
+    check(alert.quantity == 1, "quantity is 1")
+
+    -- The sample toast must not disturb the saved position.
+    check(LootToastMoverDB.point == nil, "firing a sample toast does not write a position")
+end)
+
+------------------------------------------------------------------------------------------
+-- 4.9.x put the first toast's bottom edge 31px below a 60px-tall box. The box is now 96px
+-- tall with the toast sitting directly on it, so saved positions must shift or everyone's
+-- toasts silently move on upgrade. The shift depends on the anchor point, because resizing
+-- the box moves its bottom edge by a different amount for each one.
+test("Upgrading from 4.9.x keeps toasts where they were", function()
+    -- delta = fraction * (96 - 60) - 31, where fraction is how far the bottom edge sits
+    -- below the anchor point: TOP = 1, CENTER = 0.5, BOTTOM = 0.
+    local cases = {
+        { point = "TOP",         yOfs = -200, expected = -200 + 5 },
+        { point = "TOPLEFT",     yOfs = -200, expected = -200 + 5 },
+        { point = "CENTER",      yOfs = 0,    expected = 0 - 13 },
+        { point = "LEFT",        yOfs = 40,   expected = 40 - 13 },
+        { point = "BOTTOM",      yOfs = 100,  expected = 100 - 31 },
+        { point = "BOTTOMRIGHT", yOfs = 100,  expected = 100 - 31 },
+    }
+    for _, case in ipairs(cases) do
+        mustLoad({ savedVars = { point = case.point, relPoint = case.point, xOfs = 0,
+                                 yOfs = case.yOfs } })
+        check(LootToastMoverDB.yOfs == case.expected,
+              ("%s: yOfs %d -> %d (got %s)"):format(case.point, case.yOfs, case.expected,
+                                                    tostring(LootToastMoverDB.yOfs)))
+    end
+end)
+
+-- The check above pins the exact numbers. This one proves the intent instead, deriving the
+-- answer from the two layouts rather than from the addon's own formula: the first toast's
+-- bottom edge must end up at the same screen position it occupied before the upgrade.
+test("The upgrade shift is geometrically correct", function()
+    local LEGACY_HEIGHT, LEGACY_GAP, NEW_HEIGHT = 60, 31, 96
+    local fractions = { TOP = 1, TOPLEFT = 1, CENTER = 0.5, LEFT = 0.5,
+                        BOTTOM = 0, BOTTOMRIGHT = 0 }
+    for point, fraction in pairs(fractions) do
+        local originalY = -137 -- arbitrary; the reference point cancels out
+        -- Where 4.9.x actually drew the toast, relative to the stored anchor point.
+        local before = originalY - fraction * LEGACY_HEIGHT - LEGACY_GAP
+        mustLoad({ savedVars = { point = point, relPoint = point, xOfs = 0, yOfs = originalY } })
+        -- Where this version draws it, from the migrated offset.
+        local after = LootToastMoverDB.yOfs - fraction * NEW_HEIGHT
+        check(math.abs(after - before) < 0.001,
+              ("%s: toast bottom stays at %.1f (got %.1f)"):format(point, before, after))
+    end
+end)
+
+test("The upgrade shift runs exactly once", function()
+    local saved = { point = "TOP", relPoint = "TOP", xOfs = 0, yOfs = -200 }
+    mustLoad({ savedVars = saved })
+    local afterFirst = LootToastMoverDB.yOfs
+    check(afterFirst == -195, "shifted on first load")
+
+    -- Log in again with the already-migrated table; it must not shift a second time.
+    mustLoad({ savedVars = LootToastMoverDB })
+    check(LootToastMoverDB.yOfs == afterFirst, "not shifted again on the next login")
+
+    -- A fresh install has no position to migrate and must not invent one.
+    mustLoad()
+    check(LootToastMoverDB.point == nil, "a fresh install still has no saved position")
+    check(LootToastMoverDB.yOfs == nil, "and no invented offset")
+end)
+
+------------------------------------------------------------------------------------------
 print(("\n%d passed, %d failed"):format(passed, failed))
 os.exit(failed == 0 and 0 or 1)

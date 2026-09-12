@@ -9,9 +9,18 @@ package-as: LootToastMover
 # a period (.github, .gitignore, .pkgmeta) is excluded by the packager automatically.
 ignore:
   - tests
+  - tools
   - README.md
 
 # The addon has no third-party dependencies, so there is nothing to fetch at build time
 # and no point producing the extra "nolib" zip (the variant that ships without bundled
 # libraries, for addons that pull them in as externals).
 enable-nolib-creation: no
+
+# Use the hand-written changelog for the CurseForge upload. Without this the packager
+# generates one from raw commit messages, which is not what a player wants to read on the
+# addon page. A filename the packager cannot find falls back to that generated changelog
+# silently rather than failing, so tests/check_toc.lua asserts this file exists.
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown

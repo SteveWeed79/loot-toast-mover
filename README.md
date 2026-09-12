@@ -32,11 +32,16 @@ The addon is a single Lua file with no third-party dependencies.
 | Command | Effect |
 | --- | --- |
 | `/loottoastpos` | Show or hide the draggable anchor box |
+| `/loottoastpos test` | Show a sample loot toast |
 | `/loottoastpos reset` | Move the anchor back to its default position |
 
-With the anchor box visible, drag it with the left mouse button to choose where alerts
-appear. Toasts are placed 56 pixels below the center of the anchor box. Run
-`/loottoastpos` again to hide the box once you are happy with the placement.
+The anchor box is the toast's actual footprint — same 276×96 size as a real loot toast,
+sitting exactly where the first one will appear. Drag it with the left mouse button and
+what you see is where toasts land. Further toasts stack upward from it.
+
+`/loottoastpos test` fires a genuine loot toast through Blizzard's alert system, so you
+can confirm the placement without waiting for a drop. Run `/loottoastpos` again to hide
+the box when you are done.
 
 The addon also appears in the **Addon Compartment** — the addon-list button next to the
 minimap. Clicking its entry there toggles the anchor box, same as the bare slash command.
@@ -49,11 +54,17 @@ value in-game with `/dump select(4, GetBuildInfo())`.
 
 ## Saved variables
 
-`LootToastMoverDB` is account-wide and holds the anchor's screen position.
-`/loottoastpos reset` clears those keys.
+`LootToastMoverDB` is account-wide and holds the anchor's screen position plus a `schema`
+number used for upgrades. `/loottoastpos reset` clears the position keys.
 
-Upgrading from 4.8.x also drops the stale `minimap` sub-table that the old LibDBIcon
-minimap button left behind.
+Two upgrades happen automatically on first load:
+
+- **From 4.8.x**: the stale `minimap` sub-table left behind by the old LibDBIcon button is
+  dropped.
+- **From 4.9.x**: saved positions are shifted so toasts stay exactly where you put them.
+  Older versions drew the first toast 31 pixels *below* a 60-pixel box; the box is now the
+  toast's real 96-pixel footprint with the toast sitting on it, so the stored offset has to
+  move to compensate. The shift depends on which anchor point was saved.
 
 ## Dependencies
 
@@ -73,7 +84,7 @@ Checks, all of which CI runs on every push:
 ```sh
 luacheck .                    # lint
 lua5.1 tests/run_tests.lua    # regression tests against a stubbed WoW API
-lua5.1 tests/check_toc.lua    # TOC sanity: interface number, compartment handlers, file list
+lua5.1 tests/check_toc.lua    # TOC and packaging sanity (see below)
 ```
 
 WoW runs Lua 5.1, so the tooling does too. See [tests/README.md](tests/README.md) for how
@@ -89,9 +100,38 @@ git tag -a v4.8.4 -m "4.8.4"
 git push origin v4.8.4
 ```
 
-The tag runs the test suite first and stops if it fails. Bump `## Version` in
-`LootToastMover.toc` and the banner at the top of `LootToastMover.lua` to match the tag
-before tagging — `check_toc.lua` fails the build if those two drift apart.
+The tag runs the test suite first and stops if it fails. Before tagging:
+
+1. Bump `## Version` in `LootToastMover.toc` and the banner at the top of
+   `LootToastMover.lua` to match the tag.
+2. Add a `CHANGELOG.md` entry for that version.
+
+`check_toc.lua` fails the build if the two version strings drift apart, or if the
+changelog has no entry for the version being shipped.
+
+The CurseForge upload uses `CHANGELOG.md` rather than a changelog generated from commit
+messages, via `manual-changelog` in `.pkgmeta`. If that file is ever renamed or removed
+the packager quietly falls back to the generated one, so `check_toc.lua` asserts it
+exists.
 
 Publishing requires one repository secret, `CF_API_KEY`, holding a CurseForge API token
 (Settings → Secrets and variables → Actions). `GITHUB_TOKEN` is provided automatically.
+
+### Staying current automatically
+
+Being an expansion behind is what took this addon out of service once already: a 12.x
+client will not load anything below Interface `120000`, and 4.8.3 sat on 11.1.5 for
+months.
+
+`.github/workflows/interface-bump.yml` runs daily. When Blizzard ships a patch it updates
+the Interface version, bumps the addon's patch version, writes a changelog entry, tags,
+and publishes — no intervention needed. `tools/bump_version.lua` does the version and
+changelog edits and can be run by hand too.
+
+It publishes inline rather than pushing a tag for the release workflow to pick up, because
+GitHub does not trigger workflows from events made with `GITHUB_TOKEN`; a pushed tag would
+simply sit there. To review these bumps instead of shipping them, delete the `Publish`
+step — the commit and tag are still made, and `Release` can be run manually against them.
+
+It tracks retail only. A beta or PTR Interface number would mark the addon out of date on
+the live client it is meant to support.
