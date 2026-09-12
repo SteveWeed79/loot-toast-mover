@@ -92,30 +92,24 @@ the stub works and what each test guards against.
 
 ## Releasing
 
-Pushing a version tag builds the addon and publishes it to CurseForge (project `1262382`)
-and to GitHub releases:
+Releases are cut by the **Release** workflow, from the Actions tab. Pick a bump and run it:
 
-```sh
-git tag -a v4.8.4 -m "4.8.4"
-git push origin v4.8.4
-```
+| Bump | Effect |
+| --- | --- |
+| `none` | Tag and publish what is already committed, version unchanged |
+| `patch` | 4.10.0 → 4.10.1 |
+| `minor` | 4.10.0 → 4.11.0 |
+| `major` | 4.10.0 → 5.0.0 |
 
-The tag runs the test suite first and stops if it fails. Before tagging:
+The workflow bumps `## Version` in the TOC, the banner in `LootToastMover.lua` and
+`CHANGELOG.md` together, commits, tags, runs the tests, and publishes to CurseForge
+(project `1262382`) and GitHub releases. The optional **notes** input becomes the
+changelog line. Nothing ships if the tests fail.
 
-1. Bump `## Version` in `LootToastMover.toc` and the banner at the top of
-   `LootToastMover.lua` to match the tag.
-2. Add a `CHANGELOG.md` entry for that version.
+`tools/bump_version.lua <none|patch|minor|major> [note]` does the file edits and can be
+run by hand; it prints the resulting version.
 
-`check_toc.lua` fails the build if the two version strings drift apart, or if the
-changelog has no entry for the version being shipped.
-
-The CurseForge upload uses `CHANGELOG.md` rather than a changelog generated from commit
-messages, via `manual-changelog` in `.pkgmeta`. If that file is ever renamed or removed
-the packager quietly falls back to the generated one, so `check_toc.lua` asserts it
-exists.
-
-Publishing requires one repository secret, `CF_API_KEY`, holding a CurseForge API token
-(Settings → Secrets and variables → Actions). `GITHUB_TOKEN` is provided automatically.
+Pushing a `v*` tag manually also works and just packages that tag.
 
 ### Staying current automatically
 
@@ -123,15 +117,16 @@ Being an expansion behind is what took this addon out of service once already: a
 client will not load anything below Interface `120000`, and 4.8.3 sat on 11.1.5 for
 months.
 
-`.github/workflows/interface-bump.yml` runs daily. When Blizzard ships a patch it updates
-the Interface version, bumps the addon's patch version, writes a changelog entry, tags,
-and publishes — no intervention needed. `tools/bump_version.lua` does the version and
-changelog edits and can be run by hand too.
+The same workflow runs daily. When Blizzard ships a patch it updates the Interface
+version and releases a patch bump on its own, with a changelog entry naming the game
+version. When nothing has changed it stops after the check. It tracks retail only — a
+beta or PTR Interface number would mark the addon out of date on the live client it is
+meant to support.
 
-It publishes inline rather than pushing a tag for the release workflow to pick up, because
-GitHub does not trigger workflows from events made with `GITHUB_TOKEN`; a pushed tag would
-simply sit there. To review these bumps instead of shipping them, delete the `Publish`
-step — the commit and tag are still made, and `Release` can be run manually against them.
+Bumping and publishing live in one workflow deliberately. Pushing a tag from a workflow
+does not start another workflow, because GitHub does not trigger runs from events made
+with `GITHUB_TOKEN`, so a job that only tagged would appear to succeed and publish
+nothing.
 
-It tracks retail only. A beta or PTR Interface number would mark the addon out of date on
-the live client it is meant to support.
+Publishing requires one repository secret, `CF_API_KEY`, holding a CurseForge API token
+(Settings → Secrets and variables → Actions). `GITHUB_TOKEN` is provided automatically.
