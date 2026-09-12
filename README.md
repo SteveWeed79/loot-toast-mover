@@ -25,7 +25,7 @@ The release zip already contains a correctly named `LootToastMover/` folder. If 
 from a git checkout instead, the folder **must** be named `LootToastMover` — the
 repository directory name (`loot-toast-mover`) will not load.
 
-The `Libs/` directory is bundled, so there are no separate dependencies to install.
+The addon is a single Lua file with no third-party dependencies.
 
 ## Usage
 
@@ -38,9 +38,8 @@ With the anchor box visible, drag it with the left mouse button to choose where 
 appear. Toasts are placed 56 pixels below the center of the anchor box. Run
 `/loottoastpos` again to hide the box once you are happy with the placement.
 
-If you use a DataBroker display (Titan Panel, ChocolateBar, etc.) the addon also registers
-a broker object; left-clicking it toggles the anchor box. Otherwise it adds a minimap
-button, which you can drag around the minimap — that position is remembered too.
+The addon also appears in the **Addon Compartment** — the addon-list button next to the
+minimap. Clicking its entry there toggles the anchor box, same as the bare slash command.
 
 ## Compatibility
 
@@ -50,20 +49,18 @@ value in-game with `/dump select(4, GetBuildInfo())`.
 
 ## Saved variables
 
-`LootToastMoverDB` is account-wide and holds the anchor's screen position, plus a
-`minimap` sub-table owned by LibDBIcon for the minimap button's angle and hidden state.
-`/loottoastpos reset` clears the position keys and leaves the minimap settings alone.
+`LootToastMoverDB` is account-wide and holds the anchor's screen position.
+`/loottoastpos reset` clears those keys.
 
-## Bundled libraries
+Upgrading from 4.8.x also drops the stale `minimap` sub-table that the old LibDBIcon
+minimap button left behind.
 
-| Library | Purpose |
-| --- | --- |
-| [LibStub](https://www.wowace.com/projects/libstub) | Library versioning stub |
-| [CallbackHandler-1.0](https://www.wowace.com/projects/callbackhandler) | Event callbacks used by the libraries below |
-| [LibDataBroker-1.1](https://github.com/tekkub/libdatabroker-1-1) | Broker data object |
-| [LibDBIcon-1.0](https://www.wowace.com/projects/libdbicon-1-0) | Minimap button |
+## Dependencies
 
-These are third-party libraries redistributed under their own licenses.
+None. Versions up to 4.8.x bundled LibStub, CallbackHandler-1.0, LibDataBroker-1.1 and
+LibDBIcon-1.0 — roughly 930 lines of third-party code — purely to put a clickable button
+near the minimap. Blizzard's Addon Compartment (TOC-registered since 10.1) does that
+natively, so 4.9.0 drops all four.
 
 ## Development
 
@@ -76,7 +73,7 @@ Checks, all of which CI runs on every push:
 ```sh
 luacheck .                    # lint
 lua5.1 tests/run_tests.lua    # regression tests against a stubbed WoW API
-lua5.1 tests/check_toc.lua    # TOC sanity: interface number, file list, load order
+lua5.1 tests/check_toc.lua    # TOC sanity: interface number, compartment handlers, file list
 ```
 
 WoW runs Lua 5.1, so the tooling does too. See [tests/README.md](tests/README.md) for how

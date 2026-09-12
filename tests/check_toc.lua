@@ -61,8 +61,20 @@ if not (directives["X-Curse-Project-ID"] or ""):match("^%d+$") then
     fail("## X-Curse-Project-ID is missing or not numeric")
 end
 
--- Every listed file has to exist, and the libraries have to come before the file that
--- uses them.
+-- The Addon Compartment looks its handlers up as globals by the name given in the TOC, so
+-- a rename that misses one side silently produces a dead compartment entry.
+for _, key in ipairs({ "AddonCompartmentFunc", "AddonCompartmentFuncOnEnter",
+                       "AddonCompartmentFuncOnLeave" }) do
+    local fname = directives[key]
+    if not fname or fname == "" then
+        fail("missing ## " .. key)
+    elseif not source:find("function%s+" .. fname:gsub("%W", "%%%0") .. "%s*%(") then
+        fail(("## %s names %s, but LootToastMover.lua defines no such global function")
+            :format(key, fname))
+    end
+end
+
+-- Every listed file has to exist, and load order has to put dependencies first.
 local seenLib, addonIndex = false, nil
 for i, rel in ipairs(files) do
     local f = io.open(ROOT .. "/" .. rel)

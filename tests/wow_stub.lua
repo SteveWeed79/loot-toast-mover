@@ -1,8 +1,7 @@
 -- Minimal emulation of the World of Warcraft API, enough to execute LootToastMover
 -- outside the game. Widget methods that the addon does not depend on are no-ops.
 --
--- This is deliberately small: it models only what the addon actually touches, plus the
--- parts of the LibDBIcon contract the addon relies on.
+-- This is deliberately small: it models only what the addon actually touches.
 
 local M = {}
 
@@ -42,10 +41,10 @@ function Frame:GetScript(k) return self._scripts and self._scripts[k] end
 function Frame:RegisterEvent(e) self._events = self._events or {}; self._events[e] = true end
 function Frame:UnregisterEvent(e) if self._events then self._events[e] = nil end end
 function Frame:IsEventRegistered(e) return (self._events and self._events[e]) and true or false end
--- Assigned rather than declared with `:` so the unused self argument stays implicit.
-Frame.CreateFontString = function() return setmetatable({}, Frame) end
 function Frame:StartMoving() self._moving = true end
 function Frame:StopMovingOrSizing() self._moving = false end
+-- Assigned rather than declared with `:` so the unused self argument stays implicit.
+Frame.CreateFontString = function() return setmetatable({}, Frame) end
 
 --- Reset every global this stub owns, so each test starts from a clean client.
 function M.reset()
@@ -68,11 +67,18 @@ function M.reset()
     end
 
     _G.UIParent   = setmetatable({ _name = "UIParent" }, Frame)
-    _G.Minimap    = setmetatable({ _name = "Minimap" }, Frame)
     _G.AlertFrame = setmetatable({ _name = "AlertFrame" }, Frame)
     function _G.AlertFrame:UpdateAnchors()
         self._updateAnchorsCalls = (self._updateAnchorsCalls or 0) + 1
     end
+
+    -- GameTooltip, as much of it as the Addon Compartment tooltip uses. Lines are captured
+    -- so tests can assert on what the tooltip actually says.
+    _G.GameTooltip = setmetatable({ _name = "GameTooltip", lines = {} }, Frame)
+    function _G.GameTooltip:SetOwner(owner) self.owner = owner; self.lines = {} end
+    function _G.GameTooltip:AddLine(text) table.insert(self.lines, text) end
+    function _G.GameTooltip:Show() self._shown = true end
+    function _G.GameTooltip:Hide() self._shown = false end
 
     _G.hooksecurefunc = function(tbl, name, post)
         if type(tbl) == "string" then tbl, name, post = _G, tbl, name end
@@ -85,7 +91,7 @@ function M.reset()
     end
 
     -- Midnight-era client: the AddOn query functions live in C_AddOns and the old bare
-    -- globals are gone. Leaving IsAddOnLoaded undefined is the point of this stub.
+    -- globals are gone. Leaving IsAddOnLoaded undefined is deliberate.
     _G.loadedAddOns = {}
     _G.C_AddOns = { IsAddOnLoaded = function(n) return _G.loadedAddOns[n] or false end }
     _G.IsAddOnLoaded = nil
@@ -116,11 +122,13 @@ function M.reset()
         return n
     end
 
-    _G._loggedIn = false
-    _G.IsLoggedIn = function() return _G._loggedIn end
+    _G.IsLoggedIn = function() return true end
     _G.wipe = function(t) for k in pairs(t) do t[k] = nil end return t end
     _G.SlashCmdList = {}
     _G.LootToastMoverDB = nil
+    _G.LootToastMover_OnCompartmentClick = nil
+    _G.LootToastMover_OnCompartmentEnter = nil
+    _G.LootToastMover_OnCompartmentLeave = nil
 
     -- WoW also exposes the Lua string/table/math libraries as bare globals.
     _G.strmatch, _G.strfind, _G.strsub = string.match, string.find, string.sub
@@ -140,39 +148,6 @@ function M.reset()
         for i = 1, select("#", ...) do parts[i] = tostring(select(i, ...)) end
         table.insert(_G.CHAT, table.concat(parts, " "))
     end
-
-    _G.LibStub = nil
-    package.loaded["LibStub"] = nil
-end
-
-------------------------------------------------------------------- LibDBIcon ----------
--- Stands in for the vendored LibDBIcon-1.0, reproducing the two behaviours the addon
--- depends on, both taken from the bundled source:
---   * Register() raises a hard error when a name is registered twice  (line 383)
---   * the button's dragged position is written into the db table passed to Register
---     and read back from db.hide / db.lock                            (lines 203, 322-323)
-function M.installDBIcon()
-    local lib = LibStub:NewLibrary("LibDBIcon-1.0", 55)
-    if not lib then return LibStub("LibDBIcon-1.0") end
-    lib.buttons = {}
-
-    function lib:GetMinimapButton(name) return self.buttons[name] end
-
-    function lib:Register(name, object, db)
-        if not object.icon then error("Can't register LDB objects without icons set!") end
-        if self:GetMinimapButton(name) then
-            error("LibDBIcon-1.0: Object '" .. name .. "' is already registered.")
-        end
-        self.buttons[name] = { db = db, object = object, hidden = db and db.hide or false }
-    end
-
-    --- Simulate a user dragging the minimap button to a new angle around the minimap.
-    function lib:SimulateDrag(name, pos)
-        local b = assert(self.buttons[name], name .. " is not registered")
-        if b.db then b.db.minimapPos = pos end
-    end
-
-    return lib
 end
 
 return M

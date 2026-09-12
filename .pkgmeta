@@ -11,11 +11,7 @@ ignore:
   - tests
   - README.md
 
-# The Ace libraries under Libs/ are committed to this repository rather than pulled in as
-# externals at build time, so the zip is reproducible and the addon can be run straight
-# from a checkout. To have the packager fetch them instead, replace the committed folders
-# with an `externals:` block here.
-
-# Skip the extra "nolib" zip. That variant ships without the bundled libraries, which only
-# makes sense for addons that pull them in as externals; this one needs them included.
+# The addon has no third-party dependencies, so there is nothing to fetch at build time
+# and no point producing the extra "nolib" zip (the variant that ships without bundled
+# libraries, for addons that pull them in as externals).
 enable-nolib-creation: no

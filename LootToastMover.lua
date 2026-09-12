@@ -1,13 +1,9 @@
 
 ----------------------------------------------------------------------------------------------------
--- LootToastMover ▪ v4.8.4 ---------------------------------------------------------------------------
+-- LootToastMover ▪ v4.9.0 ---------------------------------------------------------------------------
 -- Re-anchors Blizzard's AlertFrame (loot toasts, achievements) to a draggable anchor box.
 ----------------------------------------------------------------------------------------------------
 local ADDON_NAME = ...
-
--- The bare AddOn query globals moved into C_AddOns in 10.2.0 and stopped working reliably in
--- 11.0.2. Resolve once, keeping the old global as a fallback for older Classic clients.
-local IsAddOnLoaded = (C_AddOns and C_AddOns.IsAddOnLoaded) or _G.IsAddOnLoaded
 
 local DEFAULT_POINT, DEFAULT_REL_POINT, DEFAULT_X, DEFAULT_Y = "TOP", "TOP", 0, -200
 local ALERT_Y_OFFSET = -56
@@ -17,8 +13,9 @@ local ALERT_Y_OFFSET = -56
 -- guaranteed to be in place.
 local function GetDB()
     if type(LootToastMoverDB) ~= "table" then LootToastMoverDB = {} end
-    -- LibDBIcon owns this sub-table; it stores the minimap button's angle and hidden state.
-    if type(LootToastMoverDB.minimap) ~= "table" then LootToastMoverDB.minimap = {} end
+    -- Left over from the LibDBIcon minimap button that the Addon Compartment replaced. Dropped
+    -- here so it does not linger in the saved variables file forever.
+    LootToastMoverDB.minimap = nil
     return LootToastMoverDB
 end
 
@@ -68,11 +65,14 @@ end
 
 local function ResetPosition()
     local db = GetDB()
-    -- Clear only the anchor keys; db.minimap belongs to LibDBIcon and must survive a reset.
     db.point, db.relPoint, db.xOfs, db.yOfs = nil, nil, nil, nil
     anchor:ClearAllPoints()
     anchor:SetPoint(DEFAULT_POINT, UIParent, DEFAULT_REL_POINT, DEFAULT_X, DEFAULT_Y)
     SnapAlert()
+end
+
+local function ToggleAnchor()
+    anchor:SetShown(not anchor:IsShown())
 end
 
 ------------------------------------------------ Drag handling -------------------------------------
@@ -81,44 +81,31 @@ anchor:SetScript("OnDragStop", function(self)
     AlertFrame:ClearAllPoints()         -- break existing link
     self:StopMovingOrSizing()
     local point, _, relPoint, xOfs, yOfs = self:GetPoint()
-    -- Assign field by field: replacing the table would discard db.minimap.
     local db = GetDB()
     db.point, db.relPoint, db.xOfs, db.yOfs = point, relPoint, xOfs, yOfs
     SnapAlert()
 end)
 
------------------------------------------------- Broker ---------------------------------------------
-local dataobj
-local DBIcon
+------------------------------------------------ Addon Compartment ----------------------------------
+-- Registered declaratively from the TOC, which is why these have to be globals. Blizzard calls
+-- them as func(addonName, buttonName) and func(addonName, button); see
+-- Blizzard_Minimap/Mainline/AddonCompartment.lua. This replaces the LibDataBroker launcher and
+-- LibDBIcon minimap button the addon used to carry four libraries for.
 
-local function CreateBroker()
-    if dataobj then return end
-    local LDB = LibStub and LibStub:GetLibrary("LibDataBroker-1.1", true)
-    if not LDB then return end
-    dataobj = LDB:NewDataObject("LootToastMover", {
-        type = "data source",
-        icon = "Interface\\Icons\\inv_misc_bag_10",
-        text = "LTM",
-        OnClick = function() anchor:SetShown(not anchor:IsShown()) end,
-        OnTooltipShow = function(tt)
-            tt:AddLine("LootToastMover")
-            tt:AddLine("Click to show/hide anchor", 1, 1, 1)
-            tt:AddLine("/loottoastpos reset – reset position", 0.6, 0.6, 0.6)
-        end,
-    })
+function LootToastMover_OnCompartmentClick()
+    ToggleAnchor()
 end
 
-local function RegisterMinimapIcon()
-    if not dataobj then return end
-    DBIcon = DBIcon or (LibStub and LibStub("LibDBIcon-1.0", true))
-    if not DBIcon then return end
-    -- LibDBIcon raises a hard error when the same name is registered twice.
-    if DBIcon:GetMinimapButton("LootToastMover") then return end
-    -- A broker display already surfaces the data object, so skip the extra minimap button.
-    if IsAddOnLoaded and (IsAddOnLoaded("Titan") or IsAddOnLoaded("ChocolateBar")) then return end
-    -- The third argument has to be a persisted table: LibDBIcon writes the button's dragged
-    -- position into db.minimapPos and reads db.hide/db.lock back out of it.
-    DBIcon:Register("LootToastMover", dataobj, GetDB().minimap)
+function LootToastMover_OnCompartmentEnter(_, button)
+    GameTooltip:SetOwner(button, "ANCHOR_LEFT")
+    GameTooltip:AddLine("LootToastMover")
+    GameTooltip:AddLine("Click to show or hide the anchor box", 1, 1, 1)
+    GameTooltip:AddLine("/loottoastpos reset – reset position", 0.6, 0.6, 0.6)
+    GameTooltip:Show()
+end
+
+function LootToastMover_OnCompartmentLeave()
+    GameTooltip:Hide()
 end
 
 ------------------------------------------------ Slash cmd -----------------------------------------
@@ -129,7 +116,7 @@ SlashCmdList.LOOTTOASTPOS = function(msg)
         ResetPosition()
         print("|cff00c0ff[LootToastMover]|r position reset.")
     elseif cmd == "" then
-        anchor:SetShown(not anchor:IsShown())
+        ToggleAnchor()
     else
         print("|cff00c0ff[LootToastMover]|r usage:")
         print("  |cffffd100/loottoastpos|r – show or hide the anchor box")
@@ -140,20 +127,8 @@ end
 ------------------------------------------------ Init ----------------------------------------------
 local loader = CreateFrame("Frame")
 loader:RegisterEvent("ADDON_LOADED")
-loader:RegisterEvent("PLAYER_LOGIN")
 loader:SetScript("OnEvent", function(self, event, addonName)
-    if event == "ADDON_LOADED" then
-        if addonName ~= ADDON_NAME then return end
-        ApplySavedPosition()
-        if IsLoggedIn() then
-            -- Loaded after login, so PLAYER_LOGIN will not fire again.
-            CreateBroker()
-            RegisterMinimapIcon()
-        end
-        self:UnregisterEvent("ADDON_LOADED")
-    elseif event == "PLAYER_LOGIN" then
-        CreateBroker()
-        RegisterMinimapIcon()
-        self:UnregisterEvent("PLAYER_LOGIN")
-    end
+    if addonName ~= ADDON_NAME then return end
+    ApplySavedPosition()
+    self:UnregisterEvent(event)
 end)

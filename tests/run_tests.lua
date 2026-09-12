@@ -2,7 +2,7 @@
 --
 --   lua5.1 tests/run_tests.lua
 --
--- Each section guards a bug that shipped in 4.8.3. See tests/README.md.
+-- Most sections guard a bug that shipped in 4.8.3. See tests/README.md.
 
 local here = (arg and arg[0] or "tests/run_tests.lua"):match("^(.*)[/\\][^/\\]*$") or "."
 package.path = here .. "/?.lua;" .. package.path
@@ -53,9 +53,7 @@ local function tocFiles()
     return files
 end
 
---- Load the addon the way the client would: every file, in TOC order.
--- @param opts.withLibs load the vendored libraries (default true; false simulates the
---        Libs folder not being installed)
+--- Load the addon the way the client would: every file the TOC lists, in order.
 -- @param opts.savedVars a table to install as LootToastMoverDB before loading
 -- @return the anchor frame, or nil plus the error that stopped the load
 local function loadAddon(opts)
@@ -64,25 +62,14 @@ local function loadAddon(opts)
     if opts.savedVars then _G.LootToastMoverDB = opts.savedVars end
 
     for _, rel in ipairs(tocFiles()) do
-        -- withLibs = false simulates the libraries not being installed at all.
-        local skip = rel:find("^Libs/") and opts.withLibs == false
-        if not skip then
-            if rel:find("LibDBIcon") then
-                -- The real LibDBIcon needs far more of the widget API than this stub
-                -- models, so substitute the stand-in that reproduces its contract.
-                if _G.LibStub then stub.installDBIcon() end
-            else
-                local chunk, loadErr = loadfile(ADDON_DIR .. "/" .. rel)
-                if not chunk then return nil, loadErr end
-                -- WoW passes the addon's name as each file's vararg.
-                local ok, err = pcall(chunk, "LootToastMover")
-                if not ok then return nil, err end
-            end
-        end
+        local chunk, loadErr = loadfile(ADDON_DIR .. "/" .. rel)
+        if not chunk then return nil, loadErr end
+        -- WoW passes the addon's name as each file's vararg.
+        local ok, err = pcall(chunk, "LootToastMover")
+        if not ok then return nil, err end
     end
 
     FireEvent("ADDON_LOADED", "LootToastMover")
-    _G._loggedIn = true
     FireEvent("PLAYER_LOGIN")
     TickAll(3)
     _G.CHAT = {}
@@ -98,21 +85,22 @@ end
 
 ------------------------------------------------------------------------------------------
 -- Regression: the addon's own file was listed before the libraries in the TOC, so LibStub
--- was still nil when the addon called it, and the addon failed to load outright unless
--- some other addon happened to pull LibStub in first.
-test("Loads cleanly when LootToastMover is the only addon installed", function()
+-- was still nil when the addon called it. The libraries are gone now, but the addon must
+-- still stand alone with no third-party code present at all.
+test("Loads standalone with no third-party libraries", function()
     local anchor, err = loadAddon()
-    if check(anchor ~= nil, "addon loads without another addon providing LibStub") then
+    if check(anchor ~= nil, "addon loads with nothing but its own file") then
         check(anchor:GetPoint() ~= nil, "anchor is positioned at login")
         check(AlertFrame:GetPoint() ~= nil, "AlertFrame is anchored to the anchor box")
+        check(_G.LibStub == nil, "no LibStub is required or defined")
     else
         print("          " .. tostring(err))
     end
 end)
 
 ------------------------------------------------------------------------------------------
--- Regression: the handler called the removed IsAddOnLoaded global, and re-registered the
--- minimap icon on every invocation, which LibDBIcon treats as a fatal error.
+-- Regression: the handler called the removed IsAddOnLoaded global, and re-registered a
+-- minimap icon on every invocation, which LibDBIcon treated as a fatal error.
 test("Slash command survives repeated use", function()
     local anchor = mustLoad()
     local slash = SlashCmdList.LOOTTOASTPOS
@@ -127,17 +115,30 @@ test("Slash command survives repeated use", function()
 end)
 
 ------------------------------------------------------------------------------------------
--- Regression: Register() was handed a fresh {} each time, so LibDBIcon wrote the dragged
--- position into a table that was thrown away at logout.
-test("Minimap button state is persisted", function()
-    mustLoad()
-    local DBIcon = LibStub("LibDBIcon-1.0", true)
-    if check(DBIcon and DBIcon:GetMinimapButton("LootToastMover") ~= nil,
-             "minimap button is registered") then
-        DBIcon:SimulateDrag("LootToastMover", 137.5)
-        check(LootToastMoverDB.minimap and LootToastMoverDB.minimap.minimapPos == 137.5,
-              "dragged position is stored in LootToastMoverDB.minimap")
-    end
+-- The Addon Compartment calls these by name, looked up as globals from the TOC fields, so
+-- a rename that misses the TOC silently produces a dead compartment entry.
+test("Addon Compartment entry points", function()
+    local anchor = mustLoad()
+    check(type(_G.LootToastMover_OnCompartmentClick) == "function", "click handler is a global function")
+    check(type(_G.LootToastMover_OnCompartmentEnter) == "function", "enter handler is a global function")
+    check(type(_G.LootToastMover_OnCompartmentLeave) == "function", "leave handler is a global function")
+
+    -- Blizzard calls these as func(addonName, buttonName) and func(addonName, button).
+    local before = anchor:IsShown()
+    LootToastMover_OnCompartmentClick("LootToastMover", "LeftButton")
+    check(anchor:IsShown() ~= before, "clicking the compartment entry toggles the anchor")
+    LootToastMover_OnCompartmentClick("LootToastMover", "LeftButton")
+    check(anchor:IsShown() == before, "clicking again toggles it back")
+
+    local button = { _name = "CompartmentButton" }
+    LootToastMover_OnCompartmentEnter("LootToastMover", button)
+    check(GameTooltip.owner == button, "tooltip is owned by the compartment button")
+    check(#GameTooltip.lines >= 2, "tooltip has content")
+    check(GameTooltip.lines[1] == "LootToastMover", "tooltip is titled")
+    check(GameTooltip:IsShown(), "tooltip is shown on enter")
+
+    LootToastMover_OnCompartmentLeave("LootToastMover", button)
+    check(not GameTooltip:IsShown(), "tooltip is hidden on leave")
 end)
 
 ------------------------------------------------------------------------------------------
@@ -159,21 +160,26 @@ end)
 
 ------------------------------------------------------------------------------------------
 -- Regression: OnDragStop replaced the whole LootToastMoverDB table, and reset wiped it.
--- Either one discarded LibDBIcon's sub-table along with it.
-test("Minimap settings survive anchor changes", function()
+test("Reset clears only the anchor position", function()
     local anchor = mustLoad()
-    local DBIcon = LibStub("LibDBIcon-1.0", true)
-    DBIcon:SimulateDrag("LootToastMover", 137.5)
-
     anchor:SetPoint("CENTER", UIParent, "CENTER", 10, 20)
     anchor:GetScript("OnDragStop")(anchor)
-    check(LootToastMoverDB.minimap and LootToastMoverDB.minimap.minimapPos == 137.5,
-          "dragging the anchor preserves LootToastMoverDB.minimap")
+    check(LootToastMoverDB.point == "CENTER", "position saved before reset")
 
     SlashCmdList.LOOTTOASTPOS("reset")
     check(LootToastMoverDB.point == nil, "reset clears the saved anchor position")
-    check(LootToastMoverDB.minimap and LootToastMoverDB.minimap.minimapPos == 137.5,
-          "reset preserves LootToastMoverDB.minimap")
+    check(type(LootToastMoverDB) == "table", "reset leaves the saved variables table intact")
+    check(anchor:GetPoint() == "TOP", "reset moves the anchor back to its default point")
+end)
+
+------------------------------------------------------------------------------------------
+-- The LibDBIcon minimap button is gone, so its saved sub-table is dead weight. Upgrading
+-- from 4.8.x must clear it rather than leave it in the saved variables file forever.
+test("Upgrading from 4.8.x drops the stale minimap table", function()
+    mustLoad({ savedVars = { point = "TOP", relPoint = "TOP", xOfs = 0, yOfs = -200,
+                             minimap = { minimapPos = 137.5 } } })
+    check(LootToastMoverDB.minimap == nil, "leftover minimap sub-table is removed on load")
+    check(LootToastMoverDB.point == "TOP", "the anchor position is not disturbed by the cleanup")
 end)
 
 ------------------------------------------------------------------------------------------
@@ -203,16 +209,15 @@ test("No leaked timers", function()
 end)
 
 ------------------------------------------------------------------------------------------
-test("Degrades gracefully when the libraries are absent", function()
-    local anchor, err = loadAddon({ withLibs = false })
-    if check(anchor ~= nil, "addon loads with no LibStub present") then
-        check(anchor:GetPoint() ~= nil, "anchor is still positioned")
-        check(AlertFrame:GetPoint() ~= nil, "AlertFrame is still anchored")
-        check(pcall(SlashCmdList.LOOTTOASTPOS, ""), "/loottoastpos still works")
-        check(pcall(SlashCmdList.LOOTTOASTPOS, "reset"), "/loottoastpos reset still works")
-    else
-        print("          " .. tostring(err))
-    end
+-- Blizzard calls AlertFrame:UpdateAnchors() whenever an alert appears; the hook has to put
+-- the alerts back on our anchor every time, not just once at login.
+test("Alerts stay on the anchor after Blizzard re-anchors", function()
+    local anchor = mustLoad()
+    AlertFrame:ClearAllPoints()
+    check(AlertFrame:GetPoint() == nil, "AlertFrame starts unanchored for this check")
+    AlertFrame:UpdateAnchors()
+    local _, rel = AlertFrame:GetPoint()
+    check(rel == anchor, "AlertFrame is re-anchored to the anchor box")
 end)
 
 ------------------------------------------------------------------------------------------
