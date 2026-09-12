@@ -9,6 +9,7 @@ package-as: LootToastMover
 # a period (.github, .gitignore, .pkgmeta) is excluded by the packager automatically.
 ignore:
   - tests
+  - tools
   - README.md
 
 # The addon has no third-party dependencies, so there is nothing to fetch at build time

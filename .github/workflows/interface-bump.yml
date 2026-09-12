@@ -1,0 +1,90 @@
+name: Interface bump
+
+# Keeps the addon current with the live game without anyone having to remember.
+#
+# Being an expansion behind is what took this addon out of service: a 12.x client will not
+# load anything below Interface 120000, and 4.8.3 sat on 11.1.5. This checks daily, and when
+# Blizzard ships a new patch it bumps the Interface version, bumps the addon's patch version,
+# writes a changelog entry, tags, and publishes — no intervention needed.
+#
+# It publishes inline rather than pushing a tag and letting release.yml pick it up, because
+# GitHub deliberately does not trigger workflows from events made with GITHUB_TOKEN. A pushed
+# tag would sit there and nothing would happen.
+#
+# To review these instead of shipping them, drop the "Publish" step: the commit and tag are
+# still made, and release.yml can be run manually against them from the Actions tab.
+
+on:
+  schedule:
+    - cron: "0 12 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: interface-bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Check for a new Interface version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone project
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # full history, so the packager can see tags
+
+      - name: Update the TOC Interface version
+        uses: p3lim/toc-interface-updater@v4
+        with:
+          flavor: retail
+          # Retail only. Shipping a beta or PTR interface number to live users would mark
+          # the addon out of date on the very client it is meant to support.
+
+      - name: Has anything changed?
+        id: changed
+        run: |
+          if git diff --quiet -- LootToastMover.toc; then
+            echo "result=no" >> "$GITHUB_OUTPUT"
+            echo "Interface version is already current."
+          else
+            echo "result=yes" >> "$GITHUB_OUTPUT"
+            git --no-pager diff -- LootToastMover.toc
+          fi
+
+      - name: Install Lua 5.1
+        if: steps.changed.outputs.result == 'yes'
+        run: sudo apt-get update && sudo apt-get install -y lua5.1
+
+      - name: Bump the addon version and changelog
+        if: steps.changed.outputs.result == 'yes'
+        id: bump
+        run: echo "version=$(lua5.1 tools/bump_version.lua)" >> "$GITHUB_OUTPUT"
+
+      # An Interface bump is a one-line change, but it is still going straight to players,
+      # so it does not ship without passing the same checks as everything else.
+      - name: Tests
+        if: steps.changed.outputs.result == 'yes'
+        run: |
+          lua5.1 tests/run_tests.lua
+          lua5.1 tests/check_toc.lua
+
+      - name: Commit and tag
+        if: steps.changed.outputs.result == 'yes'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add LootToastMover.toc LootToastMover.lua CHANGELOG.md
+          git commit -m "Update Interface version and release ${{ steps.bump.outputs.version }}"
+          git tag -a "v${{ steps.bump.outputs.version }}" -m "${{ steps.bump.outputs.version }}"
+          git push origin HEAD:${{ github.ref_name }}
+          git push origin "v${{ steps.bump.outputs.version }}"
+
+      - name: Publish
+        if: steps.changed.outputs.result == 'yes'
+        uses: BigWigsMods/packager@v2
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}

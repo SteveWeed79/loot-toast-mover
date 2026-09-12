@@ -116,3 +116,22 @@ exists.
 
 Publishing requires one repository secret, `CF_API_KEY`, holding a CurseForge API token
 (Settings → Secrets and variables → Actions). `GITHUB_TOKEN` is provided automatically.
+
+### Staying current automatically
+
+Being an expansion behind is what took this addon out of service once already: a 12.x
+client will not load anything below Interface `120000`, and 4.8.3 sat on 11.1.5 for
+months.
+
+`.github/workflows/interface-bump.yml` runs daily. When Blizzard ships a patch it updates
+the Interface version, bumps the addon's patch version, writes a changelog entry, tags,
+and publishes — no intervention needed. `tools/bump_version.lua` does the version and
+changelog edits and can be run by hand too.
+
+It publishes inline rather than pushing a tag for the release workflow to pick up, because
+GitHub does not trigger workflows from events made with `GITHUB_TOKEN`; a pushed tag would
+simply sit there. To review these bumps instead of shipping them, delete the `Publish`
+step — the commit and tag are still made, and `Release` can be run manually against them.
+
+It tracks retail only. A beta or PTR Interface number would mark the addon out of date on
+the live client it is meant to support.
