@@ -84,7 +84,7 @@ Checks, all of which CI runs on every push:
 ```sh
 luacheck .                    # lint
 lua5.1 tests/run_tests.lua    # regression tests against a stubbed WoW API
-lua5.1 tests/check_toc.lua    # TOC sanity: interface number, compartment handlers, file list
+lua5.1 tests/check_toc.lua    # TOC and packaging sanity (see below)
 ```
 
 WoW runs Lua 5.1, so the tooling does too. See [tests/README.md](tests/README.md) for how
@@ -100,9 +100,19 @@ git tag -a v4.8.4 -m "4.8.4"
 git push origin v4.8.4
 ```
 
-The tag runs the test suite first and stops if it fails. Bump `## Version` in
-`LootToastMover.toc` and the banner at the top of `LootToastMover.lua` to match the tag
-before tagging — `check_toc.lua` fails the build if those two drift apart.
+The tag runs the test suite first and stops if it fails. Before tagging:
+
+1. Bump `## Version` in `LootToastMover.toc` and the banner at the top of
+   `LootToastMover.lua` to match the tag.
+2. Add a `CHANGELOG.md` entry for that version.
+
+`check_toc.lua` fails the build if the two version strings drift apart, or if the
+changelog has no entry for the version being shipped.
+
+The CurseForge upload uses `CHANGELOG.md` rather than a changelog generated from commit
+messages, via `manual-changelog` in `.pkgmeta`. If that file is ever renamed or removed
+the packager quietly falls back to the generated one, so `check_toc.lua` asserts it
+exists.
 
 Publishing requires one repository secret, `CF_API_KEY`, holding a CurseForge API token
 (Settings → Secrets and variables → Actions). `GITHUB_TOKEN` is provided automatically.

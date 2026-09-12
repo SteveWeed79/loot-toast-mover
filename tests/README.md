@@ -56,7 +56,16 @@ Against 4.8.3 every section fails; against the current tree all of them pass.
 | The upgrade shift is geometrically correct | Proves the same thing from the two layouts rather than from the addon's own formula |
 | The upgrade shift runs exactly once | A migration that re-applies every login would walk the anchor off the screen |
 
-`check_toc.lua` separately verifies the interface number clears the `120000` floor, the
-CurseForge project id is present and numeric, every file the TOC lists exists, the
-compartment handlers named in the TOC are actually defined, and the `## Version` has not
-drifted from the banner in `LootToastMover.lua`.
+`check_toc.lua` separately verifies:
+
+- the interface number clears the `120000` floor a 12.x client requires
+- the CurseForge project id is present and numeric
+- every file the TOC lists actually exists, with libraries ahead of the addon's own file
+- the compartment handlers named in the TOC resolve to functions in the Lua file
+- `## Version` has not drifted from the banner in `LootToastMover.lua`
+- `.pkgmeta` names a `manual-changelog` file that exists, and that `CHANGELOG.md` has an
+  entry for the version being shipped
+
+The last one matters because the packager falls back to a changelog generated from raw
+commit messages when it cannot find the file named in `.pkgmeta`, without reporting
+anything. Each of these was confirmed to fail when deliberately broken.
