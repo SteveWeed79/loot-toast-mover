@@ -50,6 +50,11 @@ Against 4.8.3 every section fails; against the current tree all of them pass.
 | Slash argument parsing | A padded `reset` silently toggled instead, and unknown input gave no feedback |
 | No leaked timers | A 1-second ticker retried forever for the whole session |
 | Alerts stay on the anchor after Blizzard re-anchors | Blizzard calls `UpdateAnchors` on every alert; the hook has to reapply every time |
+| Anchor box is the toast footprint | The box must be the real 276×96 toast size with no fudge offset, or it does not show where toasts land |
+| Sample toast | `GetItemInfo` returns nil for an uncached item and Blizzard's setup function passes that nil onward, so the alert must wait for the item to load |
+| Upgrading from 4.9.x keeps toasts where they were | Pins the exact migrated offsets for each anchor point |
+| The upgrade shift is geometrically correct | Proves the same thing from the two layouts rather than from the addon's own formula |
+| The upgrade shift runs exactly once | A migration that re-applies every login would walk the anchor off the screen |
 
 `check_toc.lua` separately verifies the interface number clears the `120000` floor, the
 CurseForge project id is present and numeric, every file the TOC lists exists, the

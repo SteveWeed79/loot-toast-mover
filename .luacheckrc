@@ -22,6 +22,8 @@ read_globals = {
     "AlertFrame",
     "CreateFrame",
     "GameTooltip",
+    "Item",            -- ItemMixin factory, for loading the sample item
+    "LootAlertSystem", -- Blizzard's loot toast subsystem
     "UIParent",
     "hooksecurefunc",
     "strtrim",
@@ -32,9 +34,10 @@ files["tests/"] = {
     std = "lua51",
     globals = { "_G" },
     read_globals = {
-        "AlertFrame", "CHAT", "CreateFrame", "FireEvent", "GameTooltip",
-        "LootToastMoverDB", "LootToastMover_OnCompartmentClick",
+        "AlertFrame", "CHAT", "CreateFrame", "FireEvent", "FlushItemLoads", "GameTooltip",
+        "Item", "LootAlertSystem", "LootToastMoverDB", "LootToastMover_OnCompartmentClick",
         "LootToastMover_OnCompartmentEnter", "LootToastMover_OnCompartmentLeave",
-        "SlashCmdList", "TickAll", "UIParent", "UnboundedTickers", "hooksecurefunc", "strtrim",
+        "PENDING_ITEM_LOADS", "SlashCmdList", "TickAll", "UIParent", "UnboundedTickers",
+        "hooksecurefunc", "strtrim",
     },
 }
