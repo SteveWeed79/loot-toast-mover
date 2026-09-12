@@ -1,0 +1,15 @@
+# CurseForge / BigWigs packager output
+.release/
+*.zip
+
+# WoW SavedVariables captured during testing
+*.lua.bak
+WTF/
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/

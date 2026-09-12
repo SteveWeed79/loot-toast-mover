@@ -1,0 +1,13 @@
+## Interface: 120100
+## Title: LootToastMover
+## Author: Steve Weed
+## Version: 4.9.0
+## Notes: Moves loot toast alerts anywhere on screen.
+## IconTexture: Interface\Icons\inv_misc_bag_10
+## SavedVariables: LootToastMoverDB
+## AddonCompartmentFunc: LootToastMover_OnCompartmentClick
+## AddonCompartmentFuncOnEnter: LootToastMover_OnCompartmentEnter
+## AddonCompartmentFuncOnLeave: LootToastMover_OnCompartmentLeave
+## X-Curse-Project-ID: 1262382
+
+LootToastMover.lua

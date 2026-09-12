@@ -1,0 +1,17 @@
+# BigWigs packager configuration.
+# https://github.com/BigWigsMods/packager/wiki/Preparing-the-PackageMeta-File
+
+# The repository is named loot-toast-mover, but WoW requires the folder inside the zip to
+# match the TOC name, so the package is built as LootToastMover.
+package-as: LootToastMover
+
+# Development-only files that should not ship inside the addon zip. Anything starting with
+# a period (.github, .gitignore, .pkgmeta) is excluded by the packager automatically.
+ignore:
+  - tests
+  - README.md
+
+# The addon has no third-party dependencies, so there is nothing to fetch at build time
+# and no point producing the extra "nolib" zip (the variant that ships without bundled
+# libraries, for addons that pull them in as externals).
+enable-nolib-creation: no

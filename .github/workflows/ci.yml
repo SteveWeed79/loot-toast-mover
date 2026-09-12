@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Lint and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # WoW runs Lua 5.1, so lint and test against the same version.
+      - name: Install Lua 5.1 and luacheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lua5.1 luarocks
+          sudo luarocks install luacheck
+
+      - name: Luacheck
+        run: luacheck .
+
+      - name: Tests
+        run: lua5.1 tests/run_tests.lua
+
+      # A malformed TOC is invisible until the client silently refuses to load the addon,
+      # so check the basics here: the Interface number, and that every listed file exists.
+      - name: Validate TOC
+        run: lua5.1 tests/check_toc.lua
