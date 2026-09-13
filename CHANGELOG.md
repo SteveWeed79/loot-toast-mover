@@ -3,6 +3,30 @@
 Notable changes to LootToastMover. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.11.0] - 2026-09-13
+
+**You can actually find the addon now.** 4.9.0 left Blizzard's Addon Compartment as the
+only way in, which meant an installed addon looked like a missing one. Three ways back,
+and still with no bundled libraries.
+
+### Added
+
+- **The minimap button is back** — the bag icon on the minimap ring. Left-click shows or
+  hides the anchor box, right-click opens the options panel, and you can drag it anywhere
+  around the ring. Hide it from the options panel or with `/ltm minimap`.
+- **An options panel**, under Game Menu → Options → AddOns → LootToastMover, with buttons
+  for everything the slash commands do. `/ltm config` opens it directly.
+- **The broker plugin is back.** If you use Titan Panel, Bazooka, ChocolateBar, ElvUI
+  datatexts or any other broker display, LootToastMover appears in its plugin list again.
+  This was removed in 4.9.0 along with the libraries and should not have been.
+- `/ltm` as a short alias for `/loottoastpos`, plus `/ltm config` and `/ltm minimap`.
+
+### Changed
+
+- The minimap button is written against the game's own widget API rather than LibDBIcon,
+  and the broker plugin uses the LibDataBroker your broker display already loads, so the
+  addon is still a single file with no third-party dependencies.
+
 ## [4.10.0] - 2026-09-12
 
 ### Added
