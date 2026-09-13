@@ -13,7 +13,7 @@ Both exit non-zero on failure. WoW runs Lua 5.1, so the tests do too.
 
 | File | Purpose |
 | --- | --- |
-| `wow_stub.lua` | Minimal emulation of the WoW API — frames, events, timers, `GameTooltip`, and the chat `print` |
+| `wow_stub.lua` | Minimal emulation of the WoW API — frames, events, timers, `GameTooltip`, `Minimap`, the `Settings` panel registry, the cursor, and the chat `print` |
 | `run_tests.lua` | Behavioural test sections |
 | `check_toc.lua` | Static checks on `LootToastMover.toc` |
 
@@ -21,6 +21,11 @@ The stub models only what the addon actually touches; any widget method it does 
 implement is a no-op. One detail is deliberate: **`IsAddOnLoaded` is left undefined**, because
 the bare global was moved into `C_AddOns` in 10.2.0 and stopped working in 11.0.2. Leaving
 it nil is what makes the suite notice if the addon ever reaches for it again.
+
+`LibStub` is left undefined for the same kind of reason: the addon bundles no libraries and
+must load without one. `InstallBrokerLibs()` puts a stand-in LibStub and LibDataBroker in
+place before loading, standing in for the copy a broker display embeds, so the broker
+sections can test both worlds.
 
 Files are loaded in the order the `.toc` lists them, read from the `.toc` itself, because
 load order was the cause of a real bug.
@@ -55,6 +60,14 @@ Against 4.8.3 every section fails; against the current tree all of them pass.
 | Upgrading from 4.9.x keeps toasts where they were | Pins the exact migrated offsets for each anchor point |
 | The upgrade shift is geometrically correct | Proves the same thing from the two layouts rather than from the addon's own formula |
 | The upgrade shift runs exactly once | A migration that re-applies every login would walk the anchor off the screen |
+| Minimap button | 4.9.0 left the Addon Compartment as the only visible sign the addon had loaded, so players could not find it. The button must exist, show by default, and answer both mouse buttons |
+| Minimap button position round-trips | A dragged button must come back where it was put, without resurrecting the LibDBIcon table the 4.8.x cleanup removes |
+| Minimap button can be hidden and stays hidden | Hiding it is a preference, not a session toggle |
+| Options panel is registered with the game's settings | Nothing appeared under Options → AddOns, so players there concluded the addon had not loaded |
+| Options panel callbacks | Blizzard's canvas layout drives `OnRefresh`/`OnCommit`/`OnDefault`; `OnDefault` backs the panel's Defaults button |
+| Broker plugin | Broker bars only show addons that register a LibDataBroker object, and this one registered none |
+| Broker plugin is optional | The library is looked up, never bundled, so no broker bar must mean no error and no retry loop |
+| Slash command aliases | `/loottoastpos` is a lot to type for an addon nobody can find; `/ltm` has to keep working alongside it |
 
 `check_toc.lua` separately verifies:
 

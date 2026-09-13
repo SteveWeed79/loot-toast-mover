@@ -31,20 +31,40 @@ The addon is a single Lua file with no third-party dependencies.
 
 | Command | Effect |
 | --- | --- |
-| `/loottoastpos` | Show or hide the draggable anchor box |
-| `/loottoastpos test` | Show a sample loot toast |
-| `/loottoastpos reset` | Move the anchor back to its default position |
+| `/ltm` | Show or hide the draggable anchor box |
+| `/ltm test` | Show a sample loot toast |
+| `/ltm reset` | Move the anchor back to its default position |
+| `/ltm config` | Open the options panel |
+| `/ltm minimap` | Show or hide the minimap button |
+
+`/loottoastpos` is the original command and still works; `/ltm` is a shorter alias for it.
 
 The anchor box is the toast's actual footprint — same 276×96 size as a real loot toast,
 sitting exactly where the first one will appear. Drag it with the left mouse button and
 what you see is where toasts land. Further toasts stack upward from it.
 
-`/loottoastpos test` fires a genuine loot toast through Blizzard's alert system, so you
-can confirm the placement without waiting for a drop. Run `/loottoastpos` again to hide
-the box when you are done.
+`/ltm test` fires a genuine loot toast through Blizzard's alert system, so you can confirm
+the placement without waiting for a drop. Run `/ltm` again to hide the box when you are
+done.
 
-The addon also appears in the **Addon Compartment** — the addon-list button next to the
-minimap. Clicking its entry there toggles the anchor box, same as the bare slash command.
+## Where to find it
+
+The same three actions are reachable from four places, so the addon is visible however your
+UI is set up:
+
+- **Minimap button** — the bag icon on the minimap ring. Left-click toggles the anchor box,
+  right-click opens the options panel, and dragging moves the button around the ring. Hide
+  it from the options panel or with `/ltm minimap`.
+- **Options panel** — Game Menu → Options → AddOns → **LootToastMover**, with buttons for
+  everything the slash commands do. `/ltm config` opens it directly.
+- **Broker plugin** — if you run a broker display (Titan Panel, Bazooka, ChocolateBar,
+  ElvUI datatexts, …), LootToastMover appears in its plugin list as a launcher. Same clicks
+  as the minimap button.
+- **Addon Compartment** — the addon-list button next to the minimap.
+
+The broker plugin only appears when a broker display is installed. LibDataBroker is looked
+up rather than bundled, because every broker bar ships its own copy; see
+[Dependencies](#dependencies).
 
 ## Compatibility
 
@@ -54,8 +74,9 @@ value in-game with `/dump select(4, GetBuildInfo())`.
 
 ## Saved variables
 
-`LootToastMoverDB` is account-wide and holds the anchor's screen position plus a `schema`
-number used for upgrades. `/loottoastpos reset` clears the position keys.
+`LootToastMoverDB` is account-wide and holds the anchor's screen position, the minimap
+button's placement under `minimapButton`, and a `schema` number used for upgrades.
+`/ltm reset` clears the position keys.
 
 Two upgrades happen automatically on first load:
 
@@ -68,10 +89,17 @@ Two upgrades happen automatically on first load:
 
 ## Dependencies
 
-None. Versions up to 4.8.x bundled LibStub, CallbackHandler-1.0, LibDataBroker-1.1 and
-LibDBIcon-1.0 — roughly 930 lines of third-party code — purely to put a clickable button
-near the minimap. Blizzard's Addon Compartment (TOC-registered since 10.1) does that
-natively, so 4.9.0 drops all four.
+None, still. Versions up to 4.8.x bundled LibStub, CallbackHandler-1.0, LibDataBroker-1.1
+and LibDBIcon-1.0 — roughly 930 lines of third-party code — purely for a minimap button and
+a broker plugin. Both are back without any of it:
+
+- The **minimap button** is written directly against the widget API, about sixty lines in
+  `LootToastMover.lua`.
+- The **broker plugin** looks LibDataBroker up with `LibStub:GetLibrary("LibDataBroker-1.1",
+  true)` instead of shipping it. Every broker display embeds the library itself, so it is
+  always loaded whenever there is a bar for the plugin to appear on; with no bar installed
+  the lookup returns nil and the addon carries on. Registration happens once at
+  `PLAYER_LOGIN`, after every addon has loaded — there is no retry ticker.
 
 ## Development
 
