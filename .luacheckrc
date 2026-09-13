@@ -7,6 +7,7 @@ max_line_length = 110
 globals = {
     "LootToastMoverDB",
     "SLASH_LOOTTOASTPOS1",
+    "SLASH_LOOTTOASTPOS2",
     "SlashCmdList",
     -- Registered from the TOC's AddonCompartment fields, so these must be globals.
     "LootToastMover_OnCompartmentClick",
@@ -22,8 +23,12 @@ read_globals = {
     "AlertFrame",
     "CreateFrame",
     "GameTooltip",
+    "GetCursorPosition",
     "Item",            -- ItemMixin factory, for loading the sample item
+    "LibStub",         -- only ever looked up, never bundled; see the broker section
     "LootAlertSystem", -- Blizzard's loot toast subsystem
+    "Minimap",
+    "Settings",        -- the 10.0+ options system, for the AddOns panel
     "UIParent",
     "hooksecurefunc",
     "strtrim",
@@ -35,9 +40,10 @@ files["tests/"] = {
     globals = { "_G" },
     read_globals = {
         "AlertFrame", "CHAT", "CreateFrame", "FireEvent", "FlushItemLoads", "GameTooltip",
-        "Item", "LootAlertSystem", "LootToastMoverDB", "LootToastMover_OnCompartmentClick",
-        "LootToastMover_OnCompartmentEnter", "LootToastMover_OnCompartmentLeave",
-        "PENDING_ITEM_LOADS", "SlashCmdList", "TickAll", "UIParent", "UnboundedTickers",
-        "hooksecurefunc", "strtrim",
+        "GetCursorPosition", "Item", "LibStub", "LootAlertSystem", "LootToastMoverDB",
+        "LootToastMover_OnCompartmentClick", "LootToastMover_OnCompartmentEnter",
+        "LootToastMover_OnCompartmentLeave", "InstallBrokerLibs", "LootToastMoverMinimapButton",
+        "Minimap", "MoveCursorTo", "PENDING_ITEM_LOADS", "Settings", "SlashCmdList", "TickAll",
+        "UIParent", "UnboundedTickers", "hooksecurefunc", "strtrim",
     },
 }

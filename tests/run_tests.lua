@@ -55,11 +55,13 @@ end
 
 --- Load the addon the way the client would: every file the TOC lists, in order.
 -- @param opts.savedVars a table to install as LootToastMoverDB before loading
+-- @param opts.broker install LibStub + LibDataBroker first, as a broker display would
 -- @return the anchor frame, or nil plus the error that stopped the load
 local function loadAddon(opts)
     opts = opts or {}
     stub.reset()
     if opts.savedVars then _G.LootToastMoverDB = opts.savedVars end
+    if opts.broker then InstallBrokerLibs() end
 
     for _, rel in ipairs(tocFiles()) do
         local chunk, loadErr = loadfile(ADDON_DIR .. "/" .. rel)
@@ -314,6 +316,173 @@ test("The upgrade shift runs exactly once", function()
     mustLoad()
     check(LootToastMoverDB.point == nil, "a fresh install still has no saved position")
     check(LootToastMoverDB.yOfs == nil, "and no invented offset")
+end)
+
+------------------------------------------------------------------------------------------
+-- 4.9.0 traded the minimap button for the Addon Compartment alone, which left players who
+-- do not use the compartment with no visible sign the addon was installed at all. The
+-- button is back, written against the widget API so nothing is bundled for it.
+test("Minimap button", function()
+    local anchor = mustLoad()
+    local button = _G.LootToastMoverMinimapButton
+    if not check(button ~= nil, "a minimap button frame exists") then return end
+    check(button:IsShown(), "it is shown by default")
+    check(button:GetPoint() ~= nil, "it is positioned on the minimap")
+
+    local onClick = button:GetScript("OnClick")
+    if check(onClick ~= nil, "OnClick handler is installed") then
+        local before = anchor:IsShown()
+        onClick(button, "LeftButton")
+        check(anchor:IsShown() ~= before, "left-click toggles the anchor box")
+        onClick(button, "LeftButton")
+        check(anchor:IsShown() == before, "left-click again toggles it back")
+
+        local shown = anchor:IsShown()
+        onClick(button, "RightButton")
+        check(#Settings.opened == 1, "right-click opens the options panel")
+        check(anchor:IsShown() == shown, "right-click does not toggle the anchor box")
+    end
+
+    local onEnter = button:GetScript("OnEnter")
+    if check(onEnter ~= nil, "OnEnter handler is installed") then
+        onEnter(button)
+        check(GameTooltip.owner == button, "tooltip is owned by the minimap button")
+        check(GameTooltip.lines[1] == "LootToastMover", "tooltip is titled")
+        button:GetScript("OnLeave")(button)
+        check(not GameTooltip:IsShown(), "tooltip is hidden on leave")
+    end
+end)
+
+------------------------------------------------------------------------------------------
+-- Dragging the button has to survive a logout, and must not resurrect the LibDBIcon table
+-- that the 4.8.x cleanup exists to remove.
+test("Minimap button position round-trips", function()
+    mustLoad()
+    local button = _G.LootToastMoverMinimapButton
+    local defaultAngle = LootToastMoverDB.minimapButton.angle
+    check(type(defaultAngle) == "number", "a default angle is stored")
+
+    -- Drag the button to due north of the minimap's centre, which is 90 degrees.
+    button:GetScript("OnDragStart")(button)
+    local onUpdate = button:GetScript("OnUpdate")
+    if check(onUpdate ~= nil, "dragging installs an OnUpdate follower") then
+        local cx, cy = Minimap:GetCenter()
+        MoveCursorTo(cx, cy + 100)
+        onUpdate(button)
+        check(math.abs(LootToastMoverDB.minimapButton.angle - 90) < 0.001,
+              ("drag stores the cursor's angle (got %s)")
+                  :format(tostring(LootToastMoverDB.minimapButton.angle)))
+    end
+    button:GetScript("OnDragStop")(button)
+    check(button:GetScript("OnUpdate") == nil, "releasing stops following the cursor")
+
+    mustLoad({ savedVars = LootToastMoverDB })
+    check(math.abs(LootToastMoverDB.minimapButton.angle - 90) < 0.001,
+          "the dragged angle survives the next login")
+    check(LootToastMoverDB.minimap == nil, "the stale LibDBIcon table is still not recreated")
+end)
+
+------------------------------------------------------------------------------------------
+test("Minimap button can be hidden and stays hidden", function()
+    mustLoad()
+    local button = _G.LootToastMoverMinimapButton
+    check(button:IsShown(), "shown to begin with")
+
+    SlashCmdList.LOOTTOASTPOS("minimap")
+    check(not button:IsShown(), "/ltm minimap hides it")
+    check(LootToastMoverDB.minimapButton.hide == true, "the choice is saved")
+
+    mustLoad({ savedVars = LootToastMoverDB })
+    check(not _G.LootToastMoverMinimapButton:IsShown(), "still hidden after logging back in")
+
+    SlashCmdList.LOOTTOASTPOS("minimap")
+    check(_G.LootToastMoverMinimapButton:IsShown(), "/ltm minimap brings it back")
+    check(LootToastMoverDB.minimapButton.hide == false, "and saves that too")
+end)
+
+------------------------------------------------------------------------------------------
+-- Nothing appeared under Options → AddOns before, so players looking there concluded the
+-- addon had not loaded.
+test("Options panel is registered with the game's settings", function()
+    mustLoad()
+    check(#Settings.categories == 1, "exactly one AddOns category is registered")
+    local category = Settings.categories[1]
+    if check(category ~= nil, "the category exists") then
+        check(category.name == "LootToastMover", "it is named after the addon")
+        check(category.frame == _G.LootToastMoverOptionsPanel, "it owns the panel frame")
+    end
+
+    SlashCmdList.LOOTTOASTPOS("config")
+    check(#Settings.opened == 1, "/ltm config opens the settings panel")
+    check(Settings.opened[1] == category:GetID(), "it opens this addon's category")
+end)
+
+------------------------------------------------------------------------------------------
+-- Blizzard's canvas layout drives these three; OnDefault backs the panel's Defaults button.
+test("Options panel callbacks", function()
+    local anchor = mustLoad()
+    local panel = _G.LootToastMoverOptionsPanel
+    check(type(panel.OnRefresh) == "function", "OnRefresh is defined")
+    check(type(panel.OnCommit) == "function", "OnCommit is defined")
+    check(type(panel.OnDefault) == "function", "OnDefault is defined")
+
+    anchor:SetPoint("CENTER", UIParent, "CENTER", 300, 300)
+    anchor:GetScript("OnDragStop")(anchor)
+    SlashCmdList.LOOTTOASTPOS("minimap")
+    check(LootToastMoverDB.point == "CENTER" and LootToastMoverDB.minimapButton.hide == true,
+          "position saved and minimap button hidden before restoring defaults")
+
+    panel.OnDefault()
+    check(LootToastMoverDB.point == nil, "OnDefault resets the anchor position")
+    check(LootToastMoverDB.minimapButton.hide == false, "OnDefault restores the minimap button")
+    check(_G.LootToastMoverMinimapButton:IsShown(), "and actually shows it again")
+
+    check(pcall(panel.OnRefresh), "OnRefresh runs without error")
+    check(pcall(panel.OnCommit), "OnCommit runs without error")
+end)
+
+------------------------------------------------------------------------------------------
+-- Broker displays embed LibDataBroker themselves, so the addon looks the library up rather
+-- than bundling it. With a bar installed it must register; with none it must not care.
+test("Broker plugin", function()
+    mustLoad({ broker = true })
+    local ldb = LibStub:GetLibrary("LibDataBroker-1.1", true)
+    local dataobj = ldb.objects["LootToastMover"]
+    if not check(dataobj ~= nil, "a data object is registered when LibDataBroker is present") then
+        return
+    end
+    check(dataobj.type == "launcher", "it is a launcher, so broker bars show it as a button")
+    check(type(dataobj.icon) == "string" and dataobj.icon ~= "", "it has an icon")
+
+    local anchor = _G.LootToastMoverAnchor
+    local before = anchor:IsShown()
+    dataobj.OnClick(nil, "LeftButton")
+    check(anchor:IsShown() ~= before, "clicking the broker button toggles the anchor box")
+    dataobj.OnClick(nil, "RightButton")
+    check(#Settings.opened == 1, "right-clicking it opens the options panel")
+
+    GameTooltip:SetOwner(nil)
+    dataobj.OnTooltipShow(GameTooltip)
+    check(GameTooltip.lines[1] == "LootToastMover", "the broker tooltip is titled")
+    check(#GameTooltip.lines >= 3, "and explains what the clicks do")
+end)
+
+test("Broker plugin is optional", function()
+    local anchor, err = loadAddon()
+    if check(anchor ~= nil, "the addon still loads with no LibDataBroker anywhere") then
+        check(_G.LibStub == nil, "and does not bring a LibStub of its own")
+        check(UnboundedTickers() == 0, "and does not sit there retrying forever")
+    else
+        print("          " .. tostring(err))
+    end
+end)
+
+------------------------------------------------------------------------------------------
+-- /loottoastpos is a long thing to type, which does not help an addon nobody can find.
+test("Slash command aliases", function()
+    mustLoad()
+    check(_G.SLASH_LOOTTOASTPOS1 == "/loottoastpos", "the original command still works")
+    check(_G.SLASH_LOOTTOASTPOS2 == "/ltm", "/ltm is registered as a short alias")
 end)
 
 ------------------------------------------------------------------------------------------

@@ -47,8 +47,16 @@ function Frame:UnregisterEvent(e) if self._events then self._events[e] = nil end
 function Frame:IsEventRegistered(e) return (self._events and self._events[e]) and true or false end
 function Frame:StartMoving() self._moving = true end
 function Frame:StopMovingOrSizing() self._moving = false end
+function Frame:SetChecked(v) self._checked = v and true or false end
+function Frame:GetChecked() return self._checked and true or false end
+function Frame:GetFrameLevel() return self._level or 0 end
+function Frame:SetFrameLevel(l) self._level = l end
+function Frame:GetEffectiveScale() return self._scale or 1 end
+--- Centre of the frame in UI coordinates. Unplaced frames return nil, as in the real API.
+function Frame:GetCenter() return self._cx, self._cy end
 -- Assigned rather than declared with `:` so the unused self argument stays implicit.
 Frame.CreateFontString = function() return setmetatable({}, Frame) end
+Frame.CreateTexture = function() return setmetatable({}, Frame) end
 
 --- Reset every global this stub owns, so each test starts from a clean client.
 function M.reset()
@@ -70,8 +78,38 @@ function M.reset()
         end
     end
 
-    _G.UIParent   = setmetatable({ _name = "UIParent" }, Frame)
+    _G.UIParent   = setmetatable({ _name = "UIParent", _scale = 1 }, Frame)
     _G.AlertFrame = setmetatable({ _name = "AlertFrame" }, Frame)
+
+    -- A default-sized round minimap sitting in the top right of a 1920x1080 UI, which is
+    -- all the minimap button needs to work out where on the ring to place itself.
+    _G.Minimap = setmetatable({ _name = "Minimap", _w = 140, _h = 140,
+                                _cx = 1800, _cy = 940, _level = 0 }, Frame)
+
+    -- Cursor position in screen (pre-scale) coordinates, as GetCursorPosition reports it.
+    _G.CURSOR_X, _G.CURSOR_Y = 0, 0
+    _G.GetCursorPosition = function() return _G.CURSOR_X, _G.CURSOR_Y end
+    --- Put the cursor at a UI-space position, converting for UIParent's scale.
+    _G.MoveCursorTo = function(x, y)
+        local scale = UIParent:GetEffectiveScale()
+        _G.CURSOR_X, _G.CURSOR_Y = x * scale, y * scale
+    end
+
+    -- The 10.0+ options system. Categories are captured so tests can assert that the addon
+    -- panel is really registered and that opening it targets that category.
+    _G.Settings = {
+        categories = {},
+        opened = {},
+        RegisterCanvasLayoutCategory = function(frame, name)
+            local category = { name = name, frame = frame }
+            category.GetID = function(self) return self.ID or self.name end
+            return category
+        end,
+        RegisterAddOnCategory = function(category)
+            table.insert(_G.Settings.categories, category)
+        end,
+        OpenToCategory = function(id) table.insert(_G.Settings.opened, id) end,
+    }
     function _G.AlertFrame:UpdateAnchors()
         self._updateAnchorsCalls = (self._updateAnchorsCalls or 0) + 1
     end
@@ -162,10 +200,17 @@ function M.reset()
     _G.IsLoggedIn = function() return true end
     _G.wipe = function(t) for k in pairs(t) do t[k] = nil end return t end
     _G.SlashCmdList = {}
+    _G.SLASH_LOOTTOASTPOS1, _G.SLASH_LOOTTOASTPOS2 = nil, nil
     _G.LootToastMoverDB = nil
+    _G.LootToastMoverAnchor = nil
+    _G.LootToastMoverMinimapButton = nil
+    _G.LootToastMoverOptionsPanel = nil
     _G.LootToastMover_OnCompartmentClick = nil
     _G.LootToastMover_OnCompartmentEnter = nil
     _G.LootToastMover_OnCompartmentLeave = nil
+
+    -- No library stack by default: the addon bundles none and has to load without one.
+    _G.LibStub = nil
 
     -- WoW also exposes the Lua string/table/math libraries as bare globals.
     _G.strmatch, _G.strfind, _G.strsub = string.match, string.find, string.sub
@@ -177,6 +222,27 @@ function M.reset()
     _G.floor, _G.ceil, _G.sqrt = math.floor, math.ceil, math.sqrt
     _G.strtrim = function(s) return (tostring(s):gsub("^%s+", ""):gsub("%s+$", "")) end
     _G.strjoin = function(sep, ...) return table.concat({ ... }, sep) end
+
+    --- Install the slice of LibStub and LibDataBroker-1.1 that the addon looks up, standing
+    --- in for the copy a broker display (Titan Panel, Bazooka, ChocolateBar, …) embeds.
+    --- Not installed by default: no broker bar means no LibStub, which is the common case.
+    _G.InstallBrokerLibs = function()
+        local objects = {}
+        local ldb = {
+            objects = objects,
+            NewDataObject = function(_, name, dataobj)
+                objects[name] = dataobj
+                return dataobj
+            end,
+        }
+        _G.LibStub = {
+            GetLibrary = function(_, major)
+                if major == "LibDataBroker-1.1" then return ldb end
+                return nil
+            end,
+        }
+        return ldb
+    end
 
     -- Capture chat output so tests can assert on it.
     _G.CHAT = {}
