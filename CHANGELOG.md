@@ -3,6 +3,12 @@
 Notable changes to LootToastMover. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.11.1] - 2026-09-14
+
+### Changed
+
+- LootToastMover is now explicitly MIT licensed, and the licence ships with the addon.
+
 ## [4.11.0] - 2026-09-13
 
 **You can actually find the addon now.** 4.9.0 left Blizzard's Addon Compartment as the
