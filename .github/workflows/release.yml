@@ -1,22 +1,27 @@
 name: Release
 
-# The one workflow that publishes. Three ways in:
+# Publishing is manual. Nothing here fires on a schedule: the addon has real users, and
+# an unattended upload to CurseForge is not something that should happen while nobody is
+# looking.
 #
-#   1. Run it from the Actions tab and pick a bump. It bumps the version, writes a
-#      changelog entry, commits, tags, and publishes to CurseForge and GitHub releases.
-#      Pick "none" to release what is already committed without changing the version.
+# Two ways in:
 #
-#   2. On a schedule, to keep up with the game. Being an expansion behind is what took
-#      this addon out of service: a 12.x client will not load anything below Interface
-#      120000, and 4.8.3 sat on 11.1.5. When Blizzard ships a patch this updates the
-#      Interface version and releases a patch bump on its own. When nothing has changed
-#      it stops after the check.
+#   1. Run it from the Actions tab (or via the API) and pick a bump. It bumps the version,
+#      writes a changelog entry, commits, tags, tests, and publishes to CurseForge and
+#      GitHub releases. Pick "none" to release what is already committed without changing
+#      the version.
 #
-#   3. By pushing a v* tag by hand, which just packages and publishes that tag.
+#   2. Push a v* tag by hand, which just packages and publishes that tag.
 #
-# Bumping and publishing live together on purpose. Pushing a tag from a workflow does not
-# start another workflow -- GitHub does not trigger runs from events made with
-# GITHUB_TOKEN -- so a job that only tagged would look like it worked and publish nothing.
+# Tick "update_interface" when a new game patch has landed: it pulls the current retail
+# Interface version into the TOC as part of the release, rather than anyone remembering the
+# number. Being an expansion behind is what took this addon out of service once already --
+# a 12.x client will not load anything below Interface 120000 -- but noticing that and
+# shipping to players are separate decisions, and this keeps the second one yours.
+#
+# Bumping and publishing live in one job on purpose. Pushing a tag from a workflow does not
+# start another workflow, because GitHub does not trigger runs from events made with
+# GITHUB_TOKEN, so a job that only tagged would appear to succeed and publish nothing.
 #
 # Publishing needs a CF_API_KEY repository secret holding a CurseForge API token. The
 # project id lives in LootToastMover.toc as X-Curse-Project-ID.
@@ -35,8 +40,11 @@ on:
         type: string
         required: false
         default: ""
-  schedule:
-    - cron: "0 12 * * *"
+      update_interface:
+        description: "Also pull the current retail Interface version into the TOC"
+        type: boolean
+        required: false
+        default: false
   push:
     tags:
       - "v*"
@@ -61,71 +69,71 @@ jobs:
       - name: Install Lua 5.1
         run: sudo apt-get update && sudo apt-get install -y lua5.1
 
-      # Scheduled runs exist to catch up with the live game. Everything else skips this.
+      # Opt-in, for when a new game patch has landed. Retail only: a beta or PTR Interface
+      # number would mark the addon out of date on the very client it is meant to support.
       - name: Update the TOC Interface version
-        if: github.event_name == 'schedule'
+        if: inputs.update_interface
         uses: p3lim/toc-interface-updater@v4
         with:
           flavor: retail
-          # Retail only. A beta or PTR Interface number would mark the addon out of date
-          # on the very client it is meant to support.
 
-      # Decide whether this run bumps anything, and by how much.
-      - name: Plan
-        id: plan
+      - name: Check what the Interface update changed
+        if: inputs.update_interface
         run: |
-          if [ "${{ github.event_name }}" = "push" ]; then
-            echo "bump=skip" >> "$GITHUB_OUTPUT"   # the tag already exists
-            echo "Tag push: packaging ${GITHUB_REF_NAME} as-is."
-          elif [ "${{ github.event_name }}" = "schedule" ]; then
-            if git diff --quiet -- LootToastMover.toc; then
-              echo "bump=none-needed" >> "$GITHUB_OUTPUT"
-              echo "Interface version is already current; nothing to release."
-            else
-              echo "bump=patch" >> "$GITHUB_OUTPUT"
-              git --no-pager diff -- LootToastMover.toc
-            fi
+          if git diff --quiet -- LootToastMover.toc; then
+            echo "Interface version was already current."
           else
-            echo "bump=${{ inputs.bump }}" >> "$GITHUB_OUTPUT"
-            echo "Manual release, bump: ${{ inputs.bump }}"
+            git --no-pager diff -- LootToastMover.toc
+            # A new Interface version has to ship under a new addon version, or there is
+            # nothing for players to update to.
+            if [ "${{ inputs.bump }}" = "none" ]; then
+              echo "::error::The Interface version changed, so this needs a version bump to reach anyone. Re-run with bump: patch."
+              exit 1
+            fi
           fi
 
       - name: Apply the version bump
-        if: steps.plan.outputs.bump != 'skip' && steps.plan.outputs.bump != 'none-needed'
+        if: github.event_name != 'push' && inputs.bump != 'none'
         id: version
         run: |
-          VERSION=$(lua5.1 tools/bump_version.lua "${{ steps.plan.outputs.bump }}" "${{ inputs.notes }}")
+          VERSION=$(lua5.1 tools/bump_version.lua "${{ inputs.bump }}" "${{ inputs.notes }}")
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Releasing $VERSION"
 
+      # "none" changes no version, but still needs the current one to tag.
+      - name: Read the current version
+        if: github.event_name != 'push' && inputs.bump == 'none'
+        id: current
+        run: echo "version=$(lua5.1 tools/bump_version.lua none)" >> "$GITHUB_OUTPUT"
+
       # Nothing ships without passing the same checks as every other change.
       - name: Tests
-        if: steps.plan.outputs.bump != 'none-needed'
         run: |
           lua5.1 tests/run_tests.lua
           lua5.1 tests/check_toc.lua
 
       - name: Commit, tag and push
-        if: steps.plan.outputs.bump != 'skip' && steps.plan.outputs.bump != 'none-needed'
+        if: github.event_name != 'push'
         run: |
-          TAG="v${{ steps.version.outputs.version }}"
+          VERSION="${{ steps.version.outputs.version || steps.current.outputs.version }}"
+          TAG="v$VERSION"
           if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
             echo "::error::$TAG already exists. Pick a different bump."
             exit 1
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # "none" changes no files, so only commit when there is something to commit.
+          # Only commit when something actually changed -- "none" with no Interface update
+          # leaves the tree clean.
           if ! git diff --quiet; then
             git add LootToastMover.toc LootToastMover.lua CHANGELOG.md
-            git commit -m "Release ${{ steps.version.outputs.version }}"
+            git commit -m "Release $VERSION"
             git push origin "HEAD:${{ github.ref_name }}"
           fi
-          git tag -a "$TAG" -m "${{ steps.version.outputs.version }}"
+          git tag -a "$TAG" -m "$VERSION"
           git push origin "$TAG"
 
       - name: Publish
-        if: steps.plan.outputs.bump != 'none-needed'
         uses: BigWigsMods/packager@v2
         env:
           CF_API_KEY: ${{ secrets.CF_API_KEY }}
