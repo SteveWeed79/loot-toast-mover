@@ -8,6 +8,7 @@
 ## AddonCompartmentFunc: LootToastMover_OnCompartmentClick
 ## AddonCompartmentFuncOnEnter: LootToastMover_OnCompartmentEnter
 ## AddonCompartmentFuncOnLeave: LootToastMover_OnCompartmentLeave
+## X-License: MIT
 ## X-Curse-Project-ID: 1262382
 
 LootToastMover.lua
