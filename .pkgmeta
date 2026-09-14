@@ -10,6 +10,7 @@ package-as: LootToastMover
 ignore:
   - tests
   - tools
+  - docs
   - README.md
 
 # The addon has no third-party dependencies, so there is nothing to fetch at build time
