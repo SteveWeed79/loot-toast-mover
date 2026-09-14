@@ -486,5 +486,30 @@ test("Slash command aliases", function()
 end)
 
 ------------------------------------------------------------------------------------------
+-- The stub is only worth anything if it is strict. A permissive one returns a no-op for
+-- any method name, so a typo or a widget method Blizzard has removed sails through the
+-- whole suite and only surfaces on someone's login screen. Guard that property here, since
+-- nothing else would notice it being relaxed.
+test("The stub rejects widget methods that do not exist", function()
+    stub.reset()
+    local frame = CreateFrame("Frame", "StrictnessProbe", UIParent)
+
+    local bogus = { "SetPointy", "SetBackdropBorderColour", "ThisMethodDoesNotExist" }
+    for _, name in ipairs(bogus) do
+        local ok, err = pcall(function() return frame[name] end)
+        check(not ok, ("%s is rejected"):format(name))
+        if not ok then
+            check(tostring(err):find("not a modelled widget method", 1, true) ~= nil,
+                  ("%s reports why"):format(name))
+        end
+    end
+
+    -- Modelled methods and the stub's own bookkeeping still work.
+    check(pcall(function() return frame.SetPoint end), "modelled methods are reachable")
+    check(pcall(function() return frame.SetBackdrop end), "allowlisted real methods are reachable")
+    check(frame._nothingHere == nil, "unset underscore fields read as nil, not an error")
+end)
+
+------------------------------------------------------------------------------------------
 print(("\n%d passed, %d failed"):format(passed, failed))
 os.exit(failed == 0 and 0 or 1)

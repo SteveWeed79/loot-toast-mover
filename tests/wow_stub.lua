@@ -1,7 +1,13 @@
 -- Minimal emulation of the World of Warcraft API, enough to execute LootToastMover
--- outside the game. Widget methods that the addon does not depend on are no-ops.
+-- outside the game.
 --
--- This is deliberately small: it models only what the addon actually touches.
+-- This is deliberately small: it models only what the addon actually touches. It is also
+-- STRICT. Calling a widget method it does not know about raises, rather than quietly doing
+-- nothing, because a stub that accepts anything cannot tell a real method from a typo --
+-- and a misspelled widget call is exactly the kind of bug that only shows up on login.
+--
+-- Adding a method is meant to be a deliberate act: model it below if the behaviour matters
+-- to a test, or list it in UNMODELLED_BUT_REAL if it does not.
 
 local M = {}
 
@@ -13,12 +19,43 @@ M.stdout = print
 
 ----------------------------------------------------------------------- Frames ----------
 local Frame = {}
-Frame.__index = function(_, k)
+
+-- Genuine widget methods the addon calls whose behaviour no test depends on. They do
+-- nothing here, but they have to be named so that anything NOT on this list is an error.
+-- Keep it to methods the addon actually uses; padding it out rebuilds the blind spot.
+local UNMODELLED_BUT_REAL = {
+    -- Frame setup
+    SetClampedToScreen = true,
+    SetMovable = true,
+    EnableMouse = true,
+    RegisterForDrag = true,
+    SetFrameStrata = true,
+    -- Button
+    RegisterForClicks = true,
+    SetHighlightTexture = true,
+    -- Backdrop
+    SetBackdrop = true,
+    SetBackdropColor = true,
+    SetBackdropBorderColor = true,
+    -- FontString
+    SetText = true,
+    SetJustifyH = true,
+    SetJustifyV = true,
+    -- Texture
+    SetTexture = true,
+}
+
+Frame.__index = function(t, k)
     local v = rawget(Frame, k)
     if v ~= nil then return v end
     -- Underscore keys are this stub's own bookkeeping and must read as nil when unset.
     if type(k) == "string" and k:sub(1, 1) == "_" then return nil end
-    return noop -- unmodelled widget method
+    if UNMODELLED_BUT_REAL[k] then return noop end
+    error(("wow_stub: %s:%s() is not a modelled widget method.\n"
+        .. "  If it is real, model it in tests/wow_stub.lua or add it to "
+        .. "UNMODELLED_BUT_REAL.\n"
+        .. "  If it is a typo or a method Blizzard removed, fix the addon."):format(
+        tostring(rawget(t, "_name") or "frame"), tostring(k)), 2)
 end
 
 function Frame:SetPoint(p, rel, rp, x, y)
@@ -116,7 +153,9 @@ function M.reset()
 
     -- GameTooltip, as much of it as the Addon Compartment tooltip uses. Lines are captured
     -- so tests can assert on what the tooltip actually says.
-    _G.GameTooltip = setmetatable({ _name = "GameTooltip", lines = {} }, Frame)
+    -- owner and lines are seeded so that reading them before SetOwner finds a real value
+    -- rather than falling through to the strict __index.
+    _G.GameTooltip = setmetatable({ _name = "GameTooltip", owner = false, lines = {} }, Frame)
     function _G.GameTooltip:SetOwner(owner) self.owner = owner; self.lines = {} end
     function _G.GameTooltip:AddLine(text) table.insert(self.lines, text) end
     function _G.GameTooltip:Show() self._shown = true end

@@ -17,10 +17,15 @@ Both exit non-zero on failure. WoW runs Lua 5.1, so the tests do too.
 | `run_tests.lua` | Behavioural test sections |
 | `check_toc.lua` | Static checks on `LootToastMover.toc` |
 
-The stub models only what the addon actually touches; any widget method it does not
-implement is a no-op. One detail is deliberate: **`IsAddOnLoaded` is left undefined**, because
-the bare global was moved into `C_AddOns` in 10.2.0 and stopped working in 11.0.2. Leaving
-it nil is what makes the suite notice if the addon ever reaches for it again.
+The stub models only what the addon actually touches, and it is **strict**: calling a
+widget method it does not know about raises instead of quietly doing nothing. A permissive
+stub cannot tell a real method from a typo, so `SetPointy` or a method Blizzard has since
+removed would sail through the whole suite and only surface on someone's login screen.
+Adding a method is meant to be deliberate — model it, or list it in `UNMODELLED_BUT_REAL`.
+
+One other detail is deliberate: **`IsAddOnLoaded` is left undefined**, because the bare
+global was moved into `C_AddOns` in 10.2.0 and stopped working in 11.0.2. Leaving it nil is
+what makes the suite notice if the addon ever reaches for it again.
 
 `LibStub` is left undefined for the same kind of reason: the addon bundles no libraries and
 must load without one. `InstallBrokerLibs()` puts a stand-in LibStub and LibDataBroker in
@@ -68,6 +73,7 @@ Against 4.8.3 every section fails; against the current tree all of them pass.
 | Broker plugin | Broker bars only show addons that register a LibDataBroker object, and this one registered none |
 | Broker plugin is optional | The library is looked up, never bundled, so no broker bar must mean no error and no retry loop |
 | Slash command aliases | `/loottoastpos` is a lot to type for an addon nobody can find; `/ltm` has to keep working alongside it |
+| The stub rejects widget methods that do not exist | Guards the stub's own strictness; nothing else would notice it being relaxed |
 
 `check_toc.lua` separately verifies:
 

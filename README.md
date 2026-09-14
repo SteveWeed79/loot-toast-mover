@@ -158,3 +158,8 @@ nothing.
 
 Publishing requires one repository secret, `CF_API_KEY`, holding a CurseForge API token
 (Settings → Secrets and variables → Actions). `GITHUB_TOKEN` is provided automatically.
+
+## License
+
+[MIT](LICENSE). The addon ships the licence file inside the zip, and declares it in the
+TOC as `## X-License: MIT`.
