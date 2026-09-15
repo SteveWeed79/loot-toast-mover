@@ -134,18 +134,33 @@ function M.reset()
 
     -- The 10.0+ options system. Categories are captured so tests can assert that the addon
     -- panel is really registered and that opening it targets that category.
+    --
+    -- Two details here are modelled from the live client rather than simplified, because
+    -- skipping them is what let a crash ship: the game assigns each category a NUMERIC id,
+    -- and OpenToCategory forwards that id to C_SettingsUtil.OpenSettingsPanel, which is a C
+    -- function that rejects anything but an integer. The widely copied `category.ID = name`
+    -- idiom therefore breaks every attempt to open the panel.
+    local nextCategoryID = 100
     _G.Settings = {
         categories = {},
         opened = {},
         RegisterCanvasLayoutCategory = function(frame, name)
-            local category = { name = name, frame = frame }
-            category.GetID = function(self) return self.ID or self.name end
+            local category = { name = name, frame = frame, ID = nextCategoryID }
+            nextCategoryID = nextCategoryID + 1
+            category.GetID = function(self) return self.ID end
             return category
         end,
         RegisterAddOnCategory = function(category)
             table.insert(_G.Settings.categories, category)
         end,
-        OpenToCategory = function(id) table.insert(_G.Settings.opened, id) end,
+        OpenToCategory = function(id)
+            if type(id) ~= "number" then
+                error(("bad argument #1 to 'OpenSettingsPanel' (outside of expected range "
+                    .. "-2147483648 to 2147483647) - got %s (%s)")
+                    :format(tostring(id), type(id)), 2)
+            end
+            table.insert(_G.Settings.opened, id)
+        end,
     }
     function _G.AlertFrame:UpdateAnchors()
         self._updateAnchorsCalls = (self._updateAnchorsCalls or 0) + 1

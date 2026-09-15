@@ -37,13 +37,15 @@ read_globals = {
 -- The test harness defines stand-ins for the whole client, so it plays by looser rules.
 files["tests/"] = {
     std = "lua51",
-    globals = { "_G" },
+    -- Settings is writable here so a test can break OpenToCategory on purpose and prove the
+    -- addon survives Blizzard changing it.
+    globals = { "_G", "Settings" },
     read_globals = {
         "AlertFrame", "CHAT", "CreateFrame", "FireEvent", "FlushItemLoads", "GameTooltip",
         "GetCursorPosition", "Item", "LibStub", "LootAlertSystem", "LootToastMoverDB",
         "LootToastMover_OnCompartmentClick", "LootToastMover_OnCompartmentEnter",
         "LootToastMover_OnCompartmentLeave", "InstallBrokerLibs", "LootToastMoverMinimapButton",
-        "Minimap", "MoveCursorTo", "PENDING_ITEM_LOADS", "Settings", "SlashCmdList", "TickAll",
+        "Minimap", "MoveCursorTo", "PENDING_ITEM_LOADS", "SlashCmdList", "TickAll",
         "UIParent", "UnboundedTickers", "hooksecurefunc", "strtrim",
     },
 }

@@ -70,6 +70,8 @@ Against 4.8.3 every section fails; against the current tree all of them pass.
 | Minimap button can be hidden and stays hidden | Hiding it is a preference, not a session toggle |
 | Options panel is registered with the game's settings | Nothing appeared under Options → AddOns, so players there concluded the addon had not loaded |
 | Options panel callbacks | Blizzard's canvas layout drives `OnRefresh`/`OnCommit`/`OnDefault`; `OnDefault` backs the panel's Defaults button |
+| Opening options uses the id the game assigned | 4.11.0 overwrote the category's numeric id with the addon name, so every way into the panel threw a Lua error. Covers all three right-click routes and the slash command |
+| A broken OpenToCategory does not throw | Opening options is a convenience and must degrade to a chat line if Blizzard changes the call again, not an error popup on every right-click |
 | Broker plugin | Broker bars only show addons that register a LibDataBroker object, and this one registered none |
 | Broker plugin is optional | The library is looked up, never bundled, so no broker bar must mean no error and no retry loop |
 | Slash command aliases | `/loottoastpos` is a lot to type for an addon nobody can find; `/ltm` has to keep working alongside it |

@@ -1,7 +1,7 @@
 ## Interface: 120100
 ## Title: LootToastMover
 ## Author: Steve Weed
-## Version: 4.11.1
+## Version: 4.11.2
 ## Notes: Moves loot toast alerts anywhere on screen.
 ## IconTexture: Interface\Icons\inv_misc_bag_10
 ## SavedVariables: LootToastMoverDB
