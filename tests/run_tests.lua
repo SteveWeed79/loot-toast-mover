@@ -418,6 +418,53 @@ test("Options panel is registered with the game's settings", function()
 end)
 
 ------------------------------------------------------------------------------------------
+-- Regression, shipped in 4.11.0: the addon overwrote the category's numeric id with the
+-- addon name, copying an idiom that worked when Settings.OpenToCategory still resolved a
+-- name. It now forwards the value to C_SettingsUtil.OpenSettingsPanel, which takes an
+-- integer, so every right-click on the minimap button threw a Lua error instead of opening
+-- anything. The id the game assigns has to be left exactly as it is.
+test("Opening options uses the id the game assigned", function()
+    mustLoad()
+    local category = Settings.categories[1]
+    check(type(category:GetID()) == "number", "the addon did not overwrite the category id")
+    check(category.ID ~= "LootToastMover", "the id is not the addon name")
+
+    -- Every route into the options panel has to survive, not just the slash command.
+    local routes = {
+        ["/ltm config"] = function() SlashCmdList.LOOTTOASTPOS("config") end,
+        ["minimap right-click"] = function()
+            local button = _G.LootToastMoverMinimapButton
+            button:GetScript("OnClick")(button, "RightButton")
+        end,
+        ["compartment right-click"] = function()
+            LootToastMover_OnCompartmentClick("LootToastMover", "RightButton")
+        end,
+    }
+    for name, open in pairs(routes) do
+        local before = #Settings.opened
+        local ok, err = pcall(open)
+        check(ok, name .. " does not error" .. (ok and "" or ": " .. tostring(err)))
+        check(#Settings.opened == before + 1, name .. " opens the panel")
+        check(type(Settings.opened[#Settings.opened]) == "number",
+              name .. " passes a numeric category id")
+    end
+end)
+
+------------------------------------------------------------------------------------------
+-- Opening options is a convenience. If Blizzard changes the call again it must degrade to a
+-- chat line, not a Lua error popup every time someone right-clicks the minimap button.
+test("A broken OpenToCategory does not throw", function()
+    mustLoad()
+    Settings.OpenToCategory = function() error("simulated Blizzard API change", 2) end
+
+    _G.CHAT = {}
+    local button = _G.LootToastMoverMinimapButton
+    local ok = pcall(button:GetScript("OnClick"), button, "RightButton")
+    check(ok, "right-click still does not error")
+    check(#_G.CHAT > 0, "it explains itself in chat instead")
+end)
+
+------------------------------------------------------------------------------------------
 -- Blizzard's canvas layout drives these three; OnDefault backs the panel's Defaults button.
 test("Options panel callbacks", function()
     local anchor = mustLoad()

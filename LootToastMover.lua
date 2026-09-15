@@ -1,6 +1,6 @@
 
 ----------------------------------------------------------------------------------------------------
--- LootToastMover ▪ v4.11.1 --------------------------------------------------------------------------
+-- LootToastMover ▪ v4.11.2 --------------------------------------------------------------------------
 -- Re-anchors Blizzard's AlertFrame (loot toasts, achievements) to a draggable anchor box.
 ----------------------------------------------------------------------------------------------------
 local ADDON_NAME = ...
@@ -268,7 +268,11 @@ local function BuildOptionsPanel()
     -- well past that; the guard is only so a stripped client cannot break the whole addon.
     if Settings and Settings.RegisterCanvasLayoutCategory then
         optionsCategory = Settings.RegisterCanvasLayoutCategory(panel, DISPLAY_NAME)
-        optionsCategory.ID = DISPLAY_NAME
+        -- Do NOT assign optionsCategory.ID here. The widely copied `category.ID = name`
+        -- idiom dates from 10.0, when Settings.OpenToCategory resolved a name. It now
+        -- hands the value straight to C_SettingsUtil.OpenSettingsPanel, which takes only
+        -- the numeric id the game assigns at registration, so overwriting that id with a
+        -- string made every right-click throw "bad argument #1 to 'OpenSettingsPanel'".
         Settings.RegisterAddOnCategory(optionsCategory)
     end
 
@@ -277,11 +281,21 @@ end
 
 local optionsPanel = BuildOptionsPanel()
 
+local FALLBACK_HINT = "Use /ltm, /ltm test and /ltm reset instead."
+
 OpenOptions = function()
-    if optionsCategory and Settings and Settings.OpenToCategory then
-        Settings.OpenToCategory(optionsCategory:GetID())
-    else
-        Say("the options panel is not available on this client; use /ltm instead.")
+    if not (optionsCategory and Settings and Settings.OpenToCategory) then
+        Say("the options panel is not available on this client. " .. FALLBACK_HINT)
+        return
+    end
+    -- The id is whatever the game assigned at registration. Clients before 11.x also
+    -- resolved the category name, so that is the fallback when there is no numeric id.
+    local id = optionsCategory.GetID and optionsCategory:GetID() or optionsCategory.ID
+    if type(id) ~= "number" then id = DISPLAY_NAME end
+    -- Opening options is a convenience, never worth a Lua error popup: if Blizzard changes
+    -- the call again, say so in chat and leave the slash commands working.
+    if not pcall(Settings.OpenToCategory, id) then
+        Say("could not open the options panel. " .. FALLBACK_HINT)
     end
 end
 

@@ -3,6 +3,17 @@
 Notable changes to LootToastMover. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.11.2] - 2026-09-15
+
+### Fixed
+
+- **Opening the options panel threw a Lua error instead of opening anything.** Every route
+  in was affected: right-clicking the minimap button, right-clicking the broker plugin,
+  right-clicking the Addon Compartment entry, and `/ltm config`. The options panel itself
+  was fine and always had been — nothing could reach it. Introduced in 4.11.0.
+- If a future game patch changes that call again, the addon now says so in chat rather than
+  throwing an error popup, and the slash commands keep working.
+
 ## [4.11.1] - 2026-09-14
 
 ### Changed
