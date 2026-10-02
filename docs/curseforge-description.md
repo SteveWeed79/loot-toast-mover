@@ -56,11 +56,16 @@ uses it, not just loot:
 - Guild renames
 - Specialization unlocks
 
-Alerts stack upward from the anchor, the same way they always have.
+Alerts stack upward from the anchor, the same way they always have. Forever uses the same
+alert frame, so whichever of these alerts Forever shows land on the anchor too.
 
 ## Requirements
 
-Retail only, built for patch 12.1 (Midnight).
+Retail, built for patch 12.1 (Midnight), and **World of Warcraft: Forever**. One download
+works in both: Forever runs on the retail game client and uses the same alert system.
+
+Installing by hand for the Forever beta? Put the `LootToastMover` folder in
+`World of Warcraft/_classic_beta_/Interface/AddOns/`.
 
 **No dependencies.** The addon is a single Lua file. The minimap button is written directly
 against the game's widget API, and the broker plugin uses the LibDataBroker your broker

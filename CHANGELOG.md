@@ -3,6 +3,17 @@
 Notable changes to LootToastMover. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.12.0] - 2026-10-02
+
+### Added
+
+- **Now also loads in World of Warcraft: Forever.** One download covers both games. Forever
+  runs on the retail game client, so the addon itself needed no changes to work there: the
+  anchor box, `/ltm test`, the minimap button, the options panel, the broker plugin and the
+  Addon Compartment are all the same as in retail. Nothing changes for retail players.
+- Installing by hand for the Forever beta? The folder is
+  `World of Warcraft/_classic_beta_/Interface/AddOns/`.
+
 ## [4.11.2] - 2026-09-15
 
 ### Fixed
