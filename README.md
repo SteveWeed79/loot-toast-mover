@@ -2,7 +2,8 @@
 
 A small World of Warcraft addon that lets you move the loot toast alerts
 (`AlertFrame`) anywhere on screen instead of leaving them in Blizzard's default
-position near the top center.
+position near the top center. One download works in both retail and
+World of Warcraft: Forever.
 
 ## What it does
 
@@ -15,11 +16,15 @@ yourself. The position is saved account-wide and reapplied on login.
 
 Install from CurseForge (project `1262382`), or grab the zip from the
 [latest release](https://github.com/SteveWeed79/loot-toast-mover/releases/latest) and
-extract it into:
+extract it into the `AddOns` folder of the game you play:
 
 ```
-<World of Warcraft>/_retail_/Interface/AddOns/
+<World of Warcraft>/_retail_/Interface/AddOns/         # retail
+<World of Warcraft>/_classic_beta_/Interface/AddOns/   # Forever beta
 ```
+
+The folder for Forever's full launch on November 4 has not been announced. Whatever it is
+called, the addon goes in the `Interface/AddOns/` folder inside it.
 
 The release zip already contains a correctly named `LootToastMover/` folder. If you copy
 from a git checkout instead, the folder **must** be named `LootToastMover` — the
@@ -68,9 +73,18 @@ up rather than bundled, because every broker bar ships its own copy; see
 
 ## Compatibility
 
-Targets Interface `120100` (patch 12.1, Midnight). Patch 12.0 raised the floor for mainline
-addons to `120000`, so this has to be kept current; check the live
-value in-game with `/dump select(4, GetBuildInfo())`.
+Runs in retail and in World of Warcraft: Forever, from the same zip. The TOC lists an
+Interface number for each game: `120100` for retail (patch 12.1, Midnight) and `16001` for
+Forever (1.60.1).
+
+Forever is built on the retail client and UI, so everything the addon uses — the alert
+system, the options panel, the Addon Compartment and the minimap — is the same code in both
+games. Forever restricts what addons can read about combat, which does not affect an addon
+that never reads any.
+
+Patch 12.0 raised the floor for mainline addons to `120000`, so the retail number has to be
+kept current, and Forever's has to track its client the same way. Check the live value in
+either game with `/dump select(4, GetBuildInfo())`.
 
 ## Saved variables
 
@@ -141,8 +155,9 @@ Pushing a `v*` tag by hand also works and just packages that tag.
 
 ### When a game patch lands
 
-Tick **update_interface** on a release run. It pulls the current retail Interface version
-into the TOC as part of that release, so nobody has to look the number up.
+Tick **update_interface** on a release run. It pulls the current retail and Forever
+Interface versions into the TOC as part of that release, so nobody has to look the numbers
+up.
 
 Being an expansion behind is what took this addon out of service once already — a 12.x
 client will not load anything below Interface `120000`, and 4.8.3 sat on 11.1.5 for months
@@ -150,8 +165,12 @@ client will not load anything below Interface `120000`, and 4.8.3 sat on 11.1.5 
 second one deliberate. A run that updates the Interface version needs a real bump, not
 `none`, or there is no new version for anyone to update to; the workflow says so and stops.
 
-It tracks retail only. A beta or PTR Interface number would mark the addon out of date on
-the live client it is meant to support.
+It tracks live clients only. A beta or PTR Interface number would mark the addon out of
+date on the live client it is meant to support. Forever is the exception until it launches,
+because its beta is the only Forever client there is: for now the updater reads Forever's
+number from Blizzard's `wow_classic_beta` product. If that ever returns another game's
+build, or nothing at all, `tests/check_toc.lua` fails the run before anything is tagged or
+published.
 
 `tools/bump_version.lua <none|patch|minor|major> [note]` does the file edits and can be run
 by hand; it prints the resulting version.

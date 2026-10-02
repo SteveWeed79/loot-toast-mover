@@ -13,11 +13,12 @@ name: Release
 #
 #   2. Push a v* tag by hand, which just packages and publishes that tag.
 #
-# Tick "update_interface" when a new game patch has landed: it pulls the current retail
-# Interface version into the TOC as part of the release, rather than anyone remembering the
-# number. Being an expansion behind is what took this addon out of service once already --
-# a 12.x client will not load anything below Interface 120000 -- but noticing that and
-# shipping to players are separate decisions, and this keeps the second one yours.
+# Tick "update_interface" when a new game patch has landed: it pulls the current retail and
+# Forever Interface versions into the TOC as part of the release, rather than anyone
+# remembering the numbers. Being an expansion behind is what took this addon out of service
+# once already -- a 12.x client will not load anything below Interface 120000 -- but
+# noticing that and shipping to players are separate decisions, and this keeps the second
+# one yours.
 #
 # Bumping and publishing live in one job on purpose. Pushing a tag from a workflow does not
 # start another workflow, because GitHub does not trigger runs from events made with
@@ -41,7 +42,7 @@ on:
         required: false
         default: ""
       update_interface:
-        description: "Also pull the current retail Interface version into the TOC"
+        description: "Also pull the current retail and Forever Interface versions into the TOC"
         type: boolean
         required: false
         default: false
@@ -69,13 +70,23 @@ jobs:
       - name: Install Lua 5.1
         run: sudo apt-get update && sudo apt-get install -y lua5.1
 
-      # Opt-in, for when a new game patch has landed. Retail only: a beta or PTR Interface
-      # number would mark the addon out of date on the very client it is meant to support.
+      # Opt-in, for when a new game patch has landed. Live clients only: a beta or PTR
+      # Interface number would mark the addon out of date on the very client it is meant to
+      # support. Forever is the exception until it launches, because its beta is all there
+      # is: the action reads Forever's number from Blizzard's wow_classic_beta product for
+      # now. If that ever yields another game's build, or nothing at all, the Tests step
+      # (tests/check_toc.lua) fails the release before anything is tagged or published.
+      #
+      # The flavor list has to be a "|" block, not "|-". The action reads it line by line
+      # and drops a final line with no newline after it, so "|-" would silently lose
+      # Forever.
       - name: Update the TOC Interface version
         if: inputs.update_interface
         uses: p3lim/toc-interface-updater@v4
         with:
-          flavor: retail
+          flavor: |
+            retail
+            forever
 
       - name: Check what the Interface update changed
         if: inputs.update_interface
