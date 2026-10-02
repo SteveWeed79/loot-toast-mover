@@ -79,7 +79,9 @@ Against 4.8.3 every section fails; against the current tree all of them pass.
 
 `check_toc.lua` separately verifies:
 
-- the interface number clears the `120000` floor a 12.x client requires
+- `## Interface` lists a number for each game the addon ships for, retail and Forever
+  (`16xxx`), with retail's clearing the `120000` floor a 12.x client requires, and nothing
+  for any other client
 - the CurseForge project id is present and numeric
 - every file the TOC lists actually exists, with libraries ahead of the addon's own file
 - the compartment handlers named in the TOC resolve to functions in the Lua file

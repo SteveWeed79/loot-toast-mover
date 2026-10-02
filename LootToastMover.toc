@@ -1,4 +1,4 @@
-## Interface: 120100
+## Interface: 120100, 16001
 ## Title: LootToastMover
 ## Author: Steve Weed
 ## Version: 4.11.2

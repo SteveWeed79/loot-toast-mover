@@ -14,6 +14,15 @@ local TOC = ROOT .. "/LootToastMover.toc"
 -- addon below this does not load for a normal user.
 local MIN_INTERFACE = 120000
 
+--- Which of the addon's two games an Interface number is for, or nil for any other client.
+--- Retail numbers have had six digits since 10.0. Forever's are 16xxx, which is also how
+--- the BigWigs packager tells them apart when it tags the CurseForge upload. There is no
+--- Forever floor to check: every Forever build so far is 1.60.1, Interface 16001.
+local function gameOf(interface)
+    if interface >= 100000 and interface <= 999999 then return "retail" end
+    if interface >= 16000 and interface <= 16999 then return "Forever" end
+end
+
 local problems = {}
 local function fail(msg) table.insert(problems, msg) end
 
@@ -37,13 +46,31 @@ for _, key in ipairs({ "Interface", "Title", "Version", "SavedVariables" }) do
     end
 end
 
--- Interface number must be current enough for the client to load the addon at all.
-local interface = tonumber((directives.Interface or ""):match("^%s*(%d+)"))
-if not interface then
-    fail("## Interface is not a number: " .. tostring(directives.Interface))
-elseif interface < MIN_INTERFACE then
-    fail(("## Interface %d is below the %d floor for patch 12.x; the client will not load "
-        .. "the addon for a normal user"):format(interface, MIN_INTERFACE))
+-- One TOC serves both games by listing an Interface number for each. Every number has to
+-- belong to one of them, retail's has to clear the floor, and neither game may go missing.
+-- The release workflow's Interface update rewrites this whole line from Blizzard's version
+-- servers, so a lookup that fails or returns some other game's build has to stop the
+-- release here rather than ship.
+local interfaces, listed = {}, {}
+if directives.Interface and directives.Interface ~= "" then
+    for entry in (directives.Interface .. ","):gmatch("([^,]*),") do
+        local interface = tonumber(entry:match("^%s*(%d+)%s*$"))
+        local game = interface and gameOf(interface)
+        if not interface then
+            fail(("## Interface lists '%s', which is not a number"):format(entry))
+        elseif not game then
+            fail(("## Interface %d is not a retail or Forever number, and the addon is "
+                .. "built for those two only"):format(interface))
+        elseif game == "retail" and interface < MIN_INTERFACE then
+            fail(("## Interface %d is below the %d floor for patch 12.x; the client will "
+                .. "not load the addon for a normal user"):format(interface, MIN_INTERFACE))
+        end
+        if interface then table.insert(interfaces, interface) end
+        if game then listed[game] = true end
+    end
+    for _, game in ipairs({ "retail", "Forever" }) do
+        if not listed[game] then fail("## Interface has no " .. game .. " number") end
+    end
 end
 
 -- The in-file version banner should track ## Version, since they drifted apart before.
@@ -125,5 +152,5 @@ if #problems > 0 then
     os.exit(1)
 end
 
-print(("LootToastMover.toc ok (Interface %d, version %s, %d files, changelog present)")
-    :format(interface, directives.Version, #files))
+print(("LootToastMover.toc ok (Interface %s, version %s, %d files, changelog present)")
+    :format(table.concat(interfaces, ", "), directives.Version, #files))
