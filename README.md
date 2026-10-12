@@ -2,8 +2,9 @@
 
 A small World of Warcraft addon that lets you move the loot toast alerts
 (`AlertFrame`) anywhere on screen instead of leaving them in Blizzard's default
-position near the top center. One download works in both retail and
-World of Warcraft: Forever.
+position near the top center. One download works in every version of the game Blizzard
+runs: retail, World of Warcraft: Forever, Mists of Pandaria Classic, Classic Era,
+TBC Anniversary and Titan Reforged Classic.
 
 ## What it does
 
@@ -20,11 +21,14 @@ extract it into the `AddOns` folder of the game you play:
 
 ```
 <World of Warcraft>/_retail_/Interface/AddOns/         # retail
+<World of Warcraft>/_classic_/Interface/AddOns/        # Mists of Pandaria Classic
+<World of Warcraft>/_classic_era_/Interface/AddOns/    # Classic Era
 <World of Warcraft>/_classic_beta_/Interface/AddOns/   # Forever beta
 ```
 
-The folder for Forever's full launch on November 4 has not been announced. Whatever it is
-called, the addon goes in the `Interface/AddOns/` folder inside it.
+The other games each have a folder of their own alongside these, and the folder for
+Forever's full launch on November 4 has not been announced. Whichever game it is, the addon
+goes in the `Interface/AddOns/` folder inside that game's folder.
 
 The release zip already contains a correctly named `LootToastMover/` folder. If you copy
 from a git checkout instead, the folder **must** be named `LootToastMover` — the
@@ -65,7 +69,8 @@ UI is set up:
 - **Broker plugin** — if you run a broker display (Titan Panel, Bazooka, ChocolateBar,
   ElvUI datatexts, …), LootToastMover appears in its plugin list as a launcher. Same clicks
   as the minimap button.
-- **Addon Compartment** — the addon-list button next to the minimap.
+- **Addon Compartment** — the addon-list button next to the minimap. Retail and Forever
+  only; the Classic games do not have one.
 
 The broker plugin only appears when a broker display is installed. LibDataBroker is looked
 up rather than bundled, because every broker bar ships its own copy; see
@@ -73,18 +78,47 @@ up rather than bundled, because every broker bar ships its own copy; see
 
 ## Compatibility
 
-Runs in retail and in World of Warcraft: Forever, from the same zip. The TOC lists an
-Interface number for each game: `120100` for retail (patch 12.1, Midnight) and `16001` for
-Forever (1.60.1).
+One zip runs in every version of the game Blizzard currently runs. The TOC lists an
+Interface number for each, and a client loads the addon as long as one of them is its own:
 
-Forever is built on the retail client and UI, so everything the addon uses — the alert
-system, the options panel, the Addon Compartment and the minimap — is the same code in both
-games. Forever restricts what addons can read about combat, which does not affect an addon
+| Game | Interface | Version |
+| --- | --- | --- |
+| Retail (Midnight) | `120100` | 12.1.0 |
+| World of Warcraft: Forever | `16001` | 1.60.1 |
+| Mists of Pandaria Classic | `50504` | 5.5.4 |
+| Titan Reforged Classic (China only) | `38002` | 3.80.2 |
+| TBC Anniversary | `20506` | 2.5.6 |
+| Classic Era | `11509` | 1.15.9 |
+
+[`tools/games.lua`](tools/games.lua) is the same list in code; the TOC check and the
+release tooling both work from it.
+
+The addon needs no per-game code. Forever runs the retail client and UI, and the Classic
+games share a UI codebase whose `AlertFrame` anchors and stacks alerts exactly the way
+retail's does, with the same 276×96 loot toast, the same options panel API and the same
+minimap. All of that was checked against Blizzard's UI source for each game's current
+build. Forever restricts what addons can read about combat, which does not affect an addon
 that never reads any.
 
+What differs is how much Blizzard sends through that frame:
+
+- **Retail and Forever** — loot, achievements and the other alerts listed in
+  [the CurseForge description](docs/curseforge-description.md#what-it-moves).
+- **The Classic games** — loot never goes through it, so what moves is mostly achievement
+  toasts, in the games that have achievements. Classic Era has none, so very little appears
+  there at all.
+
+`/ltm test` fires a genuine loot toast in every game, so placement can always be checked.
+The Addon Compartment is the one feature that is not everywhere: only retail and Forever
+have one, and the Classic games ignore its TOC fields.
+
+Wrath of the Lich King Classic and Cataclysm Classic are not listed because neither is
+running any more: those realms moved on to Cataclysm Classic and then to Mists of Pandaria
+Classic.
+
 Patch 12.0 raised the floor for mainline addons to `120000`, so the retail number has to be
-kept current, and Forever's has to track its client the same way. Check the live value in
-either game with `/dump select(4, GetBuildInfo())`.
+kept current, and the others have to track their clients the same way. Check the live value
+in any game with `/dump select(4, GetBuildInfo())`.
 
 ## Saved variables
 
@@ -155,9 +189,9 @@ Pushing a `v*` tag by hand also works and just packages that tag.
 
 ### When a game patch lands
 
-Tick **update_interface** on a release run. It pulls the current retail and Forever
-Interface versions into the TOC as part of that release, so nobody has to look the numbers
-up.
+Tick **update_interface** on a release run. It pulls the current Interface version of every
+supported game into the TOC as part of that release, so nobody has to look six numbers up.
+With no **notes**, the changelog line names every game's version.
 
 Being an expansion behind is what took this addon out of service once already — a 12.x
 client will not load anything below Interface `120000`, and 4.8.3 sat on 11.1.5 for months
@@ -168,9 +202,19 @@ second one deliberate. A run that updates the Interface version needs a real bum
 It tracks live clients only. A beta or PTR Interface number would mark the addon out of
 date on the live client it is meant to support. Forever is the exception until it launches,
 because its beta is the only Forever client there is: for now the updater reads Forever's
-number from Blizzard's `wow_classic_beta` product. If that ever returns another game's
+number from Blizzard's `wow_classic_beta` product. If any lookup returns another game's
 build, or nothing at all, `tests/check_toc.lua` fails the run before anything is tagged or
 published.
+
+The workflow names the games the way the updater does — `retail`, `forever`, `mists`,
+`titan`, `anniversary` and `vanilla` — and `vanilla` is not interchangeable with
+`classic_era`. The updater checks for `classic` first, so `classic_era` quietly fetches
+Mists of Pandaria Classic a second time and leaves Classic Era out.
+
+When Blizzard moves a Classic game on to its next expansion, the new Interface number falls
+outside every range in `tools/games.lua`, and the check fails on purpose. Try the addon in
+that client, then add the game to `tools/games.lua` and the workflow's flavor list, and
+update this README and the CurseForge description.
 
 `tools/bump_version.lua <none|patch|minor|major> [note]` does the file edits and can be run
 by hand; it prints the resulting version.
