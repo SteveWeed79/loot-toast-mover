@@ -53,22 +53,33 @@ local function tocFiles()
     return files
 end
 
+-- The private table the last loadAddon shared between the addon's files, as the client does.
+local loadedNamespace
+
 --- Load the addon the way the client would: every file the TOC lists, in order.
 -- @param opts.savedVars a table to install as LootToastMoverDB before loading
 -- @param opts.broker install LibStub + LibDataBroker first, as a broker display would
+-- @param opts.locale the client language GetLocale reports, "enUS" if not given
+-- @param opts.wrapStrings replaces the string table once Locales.lua has built it
 -- @return the anchor frame, or nil plus the error that stopped the load
 local function loadAddon(opts)
     opts = opts or {}
     stub.reset()
+    if opts.locale then stub.locale = opts.locale end
     if opts.savedVars then _G.LootToastMoverDB = opts.savedVars end
     if opts.broker then InstallBrokerLibs() end
 
+    local namespace = {}
+    loadedNamespace = namespace
     for _, rel in ipairs(tocFiles()) do
         local chunk, loadErr = loadfile(ADDON_DIR .. "/" .. rel)
         if not chunk then return nil, loadErr end
-        -- WoW passes the addon's name as each file's vararg.
-        local ok, err = pcall(chunk, "LootToastMover")
+        -- WoW passes each file the addon's name and one table that all its files share.
+        local ok, err = pcall(chunk, "LootToastMover", namespace)
         if not ok then return nil, err end
+        if opts.wrapStrings and rel == "Locales.lua" then
+            namespace.L = opts.wrapStrings(namespace.L)
+        end
     end
 
     FireEvent("ADDON_LOADED", "LootToastMover")
@@ -530,6 +541,227 @@ test("Slash command aliases", function()
     mustLoad()
     check(_G.SLASH_LOOTTOASTPOS1 == "/loottoastpos", "the original command still works")
     check(_G.SLASH_LOOTTOASTPOS2 == "/ltm", "/ltm is registered as a short alias")
+end)
+
+------------------------------------------------------------------------------------------
+-- Translations. English is the source of every string, and every other client language
+-- replaces what it translates. These sections stop a new string, or a new language, from
+-- shipping half-done.
+
+-- Every language a WoW client runs in besides English. esMX and ptPT share the Spanish and
+-- Portuguese tables, and are checked too, to prove the sharing holds.
+local LANGUAGES = { "deDE", "esES", "esMX", "frFR", "itIT", "koKR", "ptBR", "ptPT", "ruRU",
+                    "zhCN", "zhTW" }
+
+--- The string table one client language sees, and the English behind it.
+local function stringsFor(locale)
+    stub.reset()
+    stub.locale = locale
+    local namespace = {}
+    assert(loadfile(ADDON_DIR .. "/Locales.lua"))("LootToastMover", namespace)
+    return namespace.L, getmetatable(namespace.L).__index
+end
+
+--- How many times `needle` appears in `text`, as plain text.
+local function occurrences(text, needle)
+    local count, from = 0, 1
+    while true do
+        local _, last = text:find(needle, from, true)
+        if not last then return count end
+        count, from = count + 1, last + 1
+    end
+end
+
+--- ", missing A, B" for a check's label, or "" when the list is empty.
+local function listed(label, items)
+    table.sort(items)
+    return #items > 0 and ("; %s %s"):format(label, table.concat(items, ", ")) or ""
+end
+
+test("Every language translates every string, and nothing else", function()
+    local _, english = stringsFor("enUS")
+    for _, locale in ipairs(LANGUAGES) do
+        local L = stringsFor(locale)
+        local missing, unknown = {}, {}
+        for key in pairs(english) do
+            if rawget(L, key) == nil then table.insert(missing, key) end
+        end
+        for key in pairs(L) do
+            if english[key] == nil then table.insert(unknown, key) end
+        end
+        check(#missing == 0, locale .. " translates every string" .. listed("missing", missing))
+        check(#unknown == 0, locale .. " has no strings English lacks" .. listed("unknown", unknown))
+    end
+end)
+
+-- Each of these has to come through translation unchanged: string.format fills in %s, the
+-- commands are typed in English in every client, and the anchor hint's line break is what
+-- keeps it inside a toast-sized box.
+local MUST_SURVIVE = { "%s", "/ltm test", "/ltm reset", "/loottoastpos", "/ltm", "\n" }
+
+test("Translations keep placeholders, commands and line breaks", function()
+    local _, english = stringsFor("enUS")
+    for _, locale in ipairs(LANGUAGES) do
+        local L = stringsFor(locale)
+        local broken = {}
+        for key, source in pairs(english) do
+            local text = rawget(L, key)
+            if text then
+                for _, token in ipairs(MUST_SURVIVE) do
+                    if occurrences(text, token) ~= occurrences(source, token) then
+                        table.insert(broken, ("%s (%s)"):format(key,
+                            token == "\n" and "line break" or token))
+                    end
+                end
+                -- Any other % would break string.format wherever the string is the format.
+                if text:gsub("%%s", ""):find("%", 1, true) then
+                    table.insert(broken, key .. " (stray %)")
+                end
+                if not text:find("%S") then table.insert(broken, key .. " (empty)") end
+            end
+        end
+        check(#broken == 0, locale .. " keeps them all" .. listed("broken:", broken))
+    end
+end)
+
+test("English clients, and any language without a table, read English", function()
+    for _, locale in ipairs({ "enUS", "enGB", "xxXX" }) do
+        local L, english = stringsFor(locale)
+        local same = next(english) ~= nil
+        for key, text in pairs(english) do
+            if L[key] ~= text then same = false end
+        end
+        check(same, locale .. " reads every string in English")
+        check(next(L) == nil, locale .. " carries no translations of its own")
+    end
+end)
+
+test("A string a language has not translated falls back to English", function()
+    local L, english = stringsFor("deDE")
+    rawset(L, "USAGE", nil)
+    check(L.USAGE == english.USAGE, "an untranslated string reads as English, not nil")
+end)
+
+test("The code asks only for strings that exist, and uses all of them", function()
+    local _, english = stringsFor("enUS")
+    local fh = assert(io.open(ADDON_DIR .. "/LootToastMover.lua"))
+    local source = fh:read("*a")
+    fh:close()
+    local used, unknown, unused = {}, {}, {}
+    for key in source:gmatch("%f[%w_]L%.([%w_]+)") do
+        used[key] = true
+        if english[key] == nil then table.insert(unknown, key) end
+    end
+    for key in pairs(english) do
+        if not used[key] then table.insert(unused, key) end
+    end
+    check(#unknown == 0, "every L.KEY in the addon has an English string" .. listed("unknown", unknown))
+    check(#unused == 0, "every English string is used, so none is translated for nothing"
+        .. listed("unused", unused))
+end)
+
+-- Pseudo-localisation: every string comes back wrapped in markers, so text that turns up
+-- without them was written into the code in English, where no translation can reach it.
+test("Every string the addon shows goes through the translations", function()
+    local function wrap(L)
+        return setmetatable({}, { __index = function(_, key)
+            local text = L[key]
+            if text == nil then error("no string named " .. tostring(key), 2) end
+            return "⟦" .. text .. "⟧"
+        end })
+    end
+    local anchor = mustLoad({ wrapStrings = wrap })
+
+    local shown = {}
+    local function collect(texts)
+        for _, text in ipairs(texts) do table.insert(shown, text) end
+    end
+    collect(stub.texts(anchor))
+    collect(stub.texts(_G.LootToastMoverOptionsPanel))
+    LootToastMover_OnCompartmentEnter("LootToastMover", { _name = "CompartmentButton" })
+    collect(GameTooltip.lines)
+
+    -- Every chat message, the ones only a failure produces included.
+    _G.CHAT = {}
+    for _, cmd in ipairs({ "bogus", "reset", "minimap", "minimap" }) do
+        SlashCmdList.LOOTTOASTPOS(cmd)
+    end
+    Settings.OpenToCategory = function() error("simulated Blizzard API change", 2) end
+    SlashCmdList.LOOTTOASTPOS("config")
+    Settings.OpenToCategory = nil
+    SlashCmdList.LOOTTOASTPOS("config")
+    _G.LootAlertSystem = nil
+    SlashCmdList.LOOTTOASTPOS("test")
+    collect(_G.CHAT)
+
+    -- The addon's name and its commands read the same in every language.
+    local untranslated = { ["LootToastMover"] = true, ["|cffffd100LootToastMover|r"] = true,
+                           ["/ltm test"] = true }
+    local leaks = {}
+    for _, text in ipairs(shown) do
+        for line in (text .. "\n"):gmatch("(.-)\n") do
+            if not untranslated[line] and not line:find("⟦", 1, true)
+                    and not line:find("⟧", 1, true) then
+                table.insert(leaks, line)
+            end
+        end
+    end
+    check(#shown >= 25, ("the check saw everything the addon shows (%d texts)"):format(#shown))
+    check(#leaks == 0, "no English text gets past the translations" .. listed("leaked:", leaks))
+end)
+
+test("Each language shows its own text", function()
+    local _, english = stringsFor("enUS")
+    for _, locale in ipairs(LANGUAGES) do
+        local anchor = mustLoad({ locale = locale })
+        local L = loadedNamespace.L
+        local function shows(texts, wanted)
+            for _, text in ipairs(texts) do
+                if text == wanted then return true end
+            end
+            return false
+        end
+        local panel = stub.texts(_G.LootToastMoverOptionsPanel)
+        LootToastMover_OnCompartmentEnter("LootToastMover", { _name = "CompartmentButton" })
+        _G.CHAT = {}
+        SlashCmdList.LOOTTOASTPOS("reset")
+        check(L.ANCHOR_HINT ~= english.ANCHOR_HINT and shows(stub.texts(anchor), L.ANCHOR_HINT)
+                  and shows(panel, L.PANEL_INTRO) and shows(panel, L.BUTTON_TOGGLE)
+                  and shows(panel, L.CHECK_MINIMAP) and GameTooltip.lines[2] == L.TOOLTIP_CLICK
+                  and (_G.CHAT[1] or ""):find(L.POSITION_RESET, 1, true) ~= nil,
+              locale .. ": the anchor box, options panel, tooltip and chat are in " .. locale)
+    end
+end)
+
+test("Option buttons widen for a long translation, and stay one width", function()
+    for _, locale in ipairs({ "enUS", unpack(LANGUAGES) }) do
+        mustLoad({ locale = locale })
+        local buttons = stub.children(_G.LootToastMoverOptionsPanel, "Button")
+        local fits = #buttons == 3
+        for _, button in ipairs(buttons) do
+            -- Room for the template's rounded ends on both sides of the label.
+            if button:GetWidth() < 200 or button:GetWidth() - button:GetTextWidth() < 24
+                    or button:GetWidth() ~= buttons[1]:GetWidth() then
+                fits = false
+            end
+        end
+        check(fits, ("%s: every label fits, and the three buttons share one width (%d)")
+            :format(locale, buttons[1] and buttons[1]:GetWidth() or 0))
+        if locale == "enUS" then
+            check(buttons[1]:GetWidth() == 200, "English keeps the original 200 wide buttons")
+        end
+    end
+end)
+
+test("The addon list description is translated too", function()
+    local notes = {}
+    for line in io.lines(ADDON_DIR .. "/LootToastMover.toc") do
+        local locale, text = line:match("^##%s*Notes%-(%a+)%s*:%s*(.-)%s*$")
+        if locale then notes[locale] = text end
+    end
+    for _, locale in ipairs(LANGUAGES) do
+        check((notes[locale] or "") ~= "", "## Notes-" .. locale .. " is there")
+    end
 end)
 
 ------------------------------------------------------------------------------------------

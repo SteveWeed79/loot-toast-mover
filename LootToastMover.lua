@@ -3,7 +3,10 @@
 -- LootToastMover ▪ v4.13.0 --------------------------------------------------------------------------
 -- Re-anchors Blizzard's AlertFrame (loot toasts, achievements) to a draggable anchor box.
 ----------------------------------------------------------------------------------------------------
-local ADDON_NAME = ...
+local ADDON_NAME, ns = ...
+
+-- Every string a player reads, in the client's language. See Locales.lua.
+local L = ns.L
 
 local DISPLAY_NAME = "LootToastMover"
 local ICON = "Interface\\Icons\\inv_misc_bag_10"
@@ -94,7 +97,9 @@ title:SetText("|cffffd100LootToastMover|r")
 
 local body = anchor:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 body:SetPoint("CENTER", 0, -2)
-body:SetText("Drag me. Toasts appear\nin this exact space.")
+-- A translation that runs long wraps inside the box instead of spilling past its edges.
+body:SetWidth(TOAST_WIDTH - 24)
+body:SetText(L.ANCHOR_HINT)
 body:SetJustifyH("CENTER")
 
 local hint = anchor:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
@@ -144,7 +149,7 @@ end
 -- what a real drop looks like in the position you have chosen.
 local function ShowSampleToast()
     if not LootAlertSystem then
-        Say("the loot alert system is not available yet.")
+        Say(L.NO_ALERT_SYSTEM)
         return
     end
     -- C_Item.GetItemInfo returns nil for an item the client has not cached, and
@@ -171,10 +176,10 @@ end)
 -- three actions, so they are written once here.
 local function FillTooltip(tooltip)
     tooltip:AddLine(DISPLAY_NAME)
-    tooltip:AddLine("Click to show or hide the anchor box", 1, 1, 1)
-    tooltip:AddLine("Right-click for options", 1, 1, 1)
-    tooltip:AddLine("/ltm test – show a sample toast", 0.6, 0.6, 0.6)
-    tooltip:AddLine("/ltm reset – reset position", 0.6, 0.6, 0.6)
+    tooltip:AddLine(L.TOOLTIP_CLICK, 1, 1, 1)
+    tooltip:AddLine(L.TOOLTIP_RIGHT_CLICK, 1, 1, 1)
+    tooltip:AddLine("/ltm test – " .. L.TOOLTIP_TEST, 0.6, 0.6, 0.6)
+    tooltip:AddLine("/ltm reset – " .. L.TOOLTIP_RESET, 0.6, 0.6, 0.6)
 end
 
 ------------------------------------------------ Options panel --------------------------------------
@@ -185,6 +190,18 @@ local OpenOptions
 
 local optionsCategory
 local refreshOptions -- set once the panel is built; syncs widgets with the saved variables
+
+-- 200 fits every English label. A translation that runs longer widens the buttons instead of
+-- spilling past their edges.
+local BUTTON_WIDTH, BUTTON_HEIGHT, BUTTON_PADDING = 200, 24, 32
+
+local function PanelButton(parent, label, onClick)
+    local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+    button:SetSize(BUTTON_WIDTH, BUTTON_HEIGHT)
+    button:SetText(label)
+    button:SetScript("OnClick", onClick)
+    return button
+end
 
 local function BuildOptionsPanel()
     local panel = CreateFrame("Frame", "LootToastMoverOptionsPanel", UIParent)
@@ -199,29 +216,27 @@ local function BuildOptionsPanel()
     blurb:SetPoint("RIGHT", panel, "RIGHT", -32, 0)
     blurb:SetJustifyH("LEFT")
     blurb:SetJustifyV("TOP")
-    blurb:SetText("Show the anchor box, drag it where you want loot toasts to appear, then "
-        .. "hide it again. Toasts land in exactly that space and stack upward from it.")
+    blurb:SetText(L.PANEL_INTRO)
 
-    local toggleButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    toggleButton:SetSize(200, 24)
+    local toggleButton = PanelButton(panel, L.BUTTON_TOGGLE, ToggleAnchor)
     toggleButton:SetPoint("TOPLEFT", blurb, "BOTTOMLEFT", 0, -16)
-    toggleButton:SetText("Show / hide anchor box")
-    toggleButton:SetScript("OnClick", ToggleAnchor)
 
-    local testButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    testButton:SetSize(200, 24)
+    local testButton = PanelButton(panel, L.BUTTON_TEST, ShowSampleToast)
     testButton:SetPoint("TOPLEFT", toggleButton, "BOTTOMLEFT", 0, -8)
-    testButton:SetText("Show a sample toast")
-    testButton:SetScript("OnClick", ShowSampleToast)
 
-    local resetButton = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-    resetButton:SetSize(200, 24)
-    resetButton:SetPoint("TOPLEFT", testButton, "BOTTOMLEFT", 0, -8)
-    resetButton:SetText("Reset position")
-    resetButton:SetScript("OnClick", function()
+    local resetButton = PanelButton(panel, L.BUTTON_RESET, function()
         ResetPosition()
-        Say("position reset.")
+        Say(L.POSITION_RESET)
     end)
+    resetButton:SetPoint("TOPLEFT", testButton, "BOTTOMLEFT", 0, -8)
+
+    -- One shared width keeps the column straight, however long the widest label is.
+    local buttons = { toggleButton, testButton, resetButton }
+    local buttonWidth = BUTTON_WIDTH
+    for _, button in ipairs(buttons) do
+        buttonWidth = math.max(buttonWidth, button:GetTextWidth() + BUTTON_PADDING)
+    end
+    for _, button in ipairs(buttons) do button:SetWidth(buttonWidth) end
 
     local check = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
     check:SetPoint("TOPLEFT", resetButton, "BOTTOMLEFT", 0, -16)
@@ -230,7 +245,7 @@ local function BuildOptionsPanel()
     -- named; creating the label here keeps both anonymous and the text under our control.
     local checkLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
     checkLabel:SetPoint("LEFT", check, "RIGHT", 2, 0)
-    checkLabel:SetText("Show the minimap button")
+    checkLabel:SetText(L.CHECK_MINIMAP)
 
     -- Assigned at the end of the file, once the minimap button exists.
     panel.setMinimapShown = nil
@@ -244,10 +259,12 @@ local function BuildOptionsPanel()
     local commands = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
     commands:SetPoint("TOPLEFT", check, "BOTTOMLEFT", 0, -16)
     commands:SetJustifyH("LEFT")
-    commands:SetText("/ltm or /loottoastpos – show or hide the anchor box\n"
-        .. "/ltm test – show a sample loot toast\n"
-        .. "/ltm reset – move the anchor back to its default position\n"
-        .. "/ltm config – open this panel")
+    commands:SetText(table.concat({
+        L.EITHER_COMMAND:format("/ltm", "/loottoastpos") .. " – " .. L.COMMAND_TOGGLE,
+        "/ltm test – " .. L.COMMAND_TEST,
+        "/ltm reset – " .. L.COMMAND_RESET,
+        "/ltm config – " .. L.COMMAND_CONFIG_HERE,
+    }, "\n"))
 
     refreshOptions = function()
         check:SetChecked(not GetDB().minimapButton.hide)
@@ -284,11 +301,9 @@ end
 
 local optionsPanel = BuildOptionsPanel()
 
-local FALLBACK_HINT = "Use /ltm, /ltm test and /ltm reset instead."
-
 OpenOptions = function()
     if not (optionsCategory and Settings and Settings.OpenToCategory) then
-        Say("the options panel is not available on this client. " .. FALLBACK_HINT)
+        Say(L.NO_OPTIONS:format(L.USE_COMMANDS))
         return
     end
     -- The id is whatever the game assigned at registration. Clients before 11.x also
@@ -298,7 +313,7 @@ OpenOptions = function()
     -- Opening options is a convenience, never worth a Lua error popup: if Blizzard changes
     -- the call again, say so in chat and leave the slash commands working.
     if not pcall(Settings.OpenToCategory, id) then
-        Say("could not open the options panel. " .. FALLBACK_HINT)
+        Say(L.OPTIONS_FAILED:format(L.USE_COMMANDS))
     end
 end
 
@@ -463,22 +478,28 @@ SlashCmdList.LOOTTOASTPOS = function(msg)
     local cmd = strtrim(msg or ""):lower()
     if cmd == "reset" then
         ResetPosition()
-        Say("position reset.")
+        Say(L.POSITION_RESET)
     elseif cmd == "test" then
         ShowSampleToast()
     elseif cmd == "config" or cmd == "options" then
         OpenOptions()
     elseif cmd == "minimap" then
-        Say("minimap button " .. (ToggleMinimapButton() and "shown." or "hidden."))
+        Say(ToggleMinimapButton() and L.MINIMAP_SHOWN or L.MINIMAP_HIDDEN)
     elseif cmd == "" then
         ToggleAnchor()
     else
-        Say("usage:")
-        print("  |cffffd100/ltm|r – show or hide the anchor box")
-        print("  |cffffd100/ltm test|r – show a sample loot toast")
-        print("  |cffffd100/ltm reset|r – move the anchor back to its default position")
-        print("  |cffffd100/ltm config|r – open the options panel")
-        print("  |cffffd100/ltm minimap|r – show or hide the minimap button")
+        -- The commands themselves are typed in English in every client; only what they do is
+        -- translated.
+        Say(L.USAGE)
+        for _, usage in ipairs({
+            { "/ltm", L.COMMAND_TOGGLE },
+            { "/ltm test", L.COMMAND_TEST },
+            { "/ltm reset", L.COMMAND_RESET },
+            { "/ltm config", L.COMMAND_CONFIG },
+            { "/ltm minimap", L.COMMAND_MINIMAP },
+        }) do
+            print(("  |cffffd100%s|r – %s"):format(usage[1], usage[2]))
+        end
     end
 end
 

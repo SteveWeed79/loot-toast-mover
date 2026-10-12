@@ -38,7 +38,6 @@ local UNMODELLED_BUT_REAL = {
     SetBackdropColor = true,
     SetBackdropBorderColor = true,
     -- FontString
-    SetText = true,
     SetJustifyH = true,
     SetJustifyV = true,
     -- Texture
@@ -70,6 +69,7 @@ function Frame:GetPoint()
 end
 function Frame:ClearAllPoints() self._point = nil end
 function Frame:SetSize(w, h) self._w, self._h = w, h end
+function Frame:SetWidth(w) self._w = w end
 function Frame:GetSize() return self._w or 0, self._h or 0 end
 function Frame:GetWidth() return self._w or 0 end
 function Frame:GetHeight() return self._h or 0 end
@@ -91,20 +91,65 @@ function Frame:SetFrameLevel(l) self._level = l end
 function Frame:GetEffectiveScale() return self._scale or 1 end
 --- Centre of the frame in UI coordinates. Unplaced frames return nil, as in the real API.
 function Frame:GetCenter() return self._cx, self._cy end
+-- Text is kept, so tests can read back what a player would see in each language.
+function Frame:SetText(text) self._text = text end
+function Frame:GetText() return self._text end
+--- Width of the text in pixels. A real client measures the font; this charges a flat 7
+--- pixels per character, which is enough to tell a long label from a short one. Characters
+--- are counted rather than bytes, so Chinese or Korean is not charged three times over.
+function Frame:GetTextWidth()
+    local _, characters = (self._text or ""):gsub("[^\128-\191]", "")
+    return characters * 7
+end
+-- Font strings and textures belong to the frame that created them, so tests can walk a frame
+-- for everything it shows.
+function Frame:CreateFontString()
+    local region = setmetatable({}, Frame)
+    self._regions = self._regions or {}
+    table.insert(self._regions, region)
+    return region
+end
 -- Assigned rather than declared with `:` so the unused self argument stays implicit.
-Frame.CreateFontString = function() return setmetatable({}, Frame) end
 Frame.CreateTexture = function() return setmetatable({}, Frame) end
+
+--- Every piece of text a frame shows, its own and its font strings' and child frames', in
+--- the order it was created.
+function M.texts(frame, out)
+    out = out or {}
+    if frame._text then table.insert(out, frame._text) end
+    for _, region in ipairs(frame._regions or {}) do M.texts(region, out) end
+    for _, child in ipairs(frame._children or {}) do M.texts(child, out) end
+    return out
+end
+
+--- A frame's child frames of one kind ("Button", "CheckButton", …), in creation order.
+function M.children(frame, kind)
+    local found = {}
+    for _, child in ipairs(frame._children or {}) do
+        if child._kind == kind then table.insert(found, child) end
+    end
+    return found
+end
 
 --- Reset every global this stub owns, so each test starts from a clean client.
 function M.reset()
     local frames = {}
 
-    _G.CreateFrame = function(_, name)
-        local f = setmetatable({ _name = name }, Frame)
+    _G.CreateFrame = function(kind, name, parent)
+        local f = setmetatable({ _name = name, _kind = kind }, Frame)
         if name then _G[name] = f end
+        if type(parent) == "table" then
+            parent._children = parent._children or {}
+            table.insert(parent._children, f)
+        end
         table.insert(frames, f)
         return f
     end
+
+    -- The client's text language. Set M.locale before loading the addon to play it in
+    -- another language.
+    M.locale = "enUS"
+    _G.GetLocale = function() return M.locale end
 
     --- Dispatch an event to every frame registered for it.
     _G.FireEvent = function(event, ...)

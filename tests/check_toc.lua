@@ -95,18 +95,26 @@ for _, key in ipairs({ "AddonCompartmentFunc", "AddonCompartmentFuncOnEnter",
 end
 
 -- Every listed file has to exist, and load order has to put dependencies first.
-local seenLib, addonIndex = false, nil
+local seenLib, addonIndex, localesIndex = false, nil, nil
 for i, rel in ipairs(files) do
     local f = io.open(ROOT .. "/" .. rel)
     if f then f:close() else fail("listed file does not exist: " .. rel) end
     if rel:find("^Libs/") then seenLib = true end
     if rel == "LootToastMover.lua" then addonIndex = i end
+    if rel == "Locales.lua" then localesIndex = i end
 end
 if #files == 0 then fail("the TOC lists no files") end
 if not addonIndex then
     fail("LootToastMover.lua is not listed in the TOC")
 elseif seenLib and files[addonIndex + 1] and files[addonIndex + 1]:find("^Libs/") then
     fail("LootToastMover.lua is listed before a library; LibStub would still be nil")
+end
+-- LootToastMover.lua reads its strings from Locales.lua as it loads, so the translations
+-- have to be listed first.
+if not localesIndex then
+    fail("Locales.lua is not listed in the TOC, so the addon would load with no strings")
+elseif addonIndex and localesIndex > addonIndex then
+    fail("Locales.lua is listed after LootToastMover.lua, which would load with no strings")
 end
 
 -- The packager falls back to a changelog generated from raw commit messages when the
