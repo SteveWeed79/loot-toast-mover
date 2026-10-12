@@ -40,7 +40,8 @@ However your UI is set up, the addon is somewhere you'll find it:
   minimap button.
 - **Broker plugin** — if you run Titan Panel, Bazooka, ChocolateBar, ElvUI datatexts or any
   other broker display, LootToastMover appears in its plugin list as a launcher.
-- **Addon Compartment** — the addon-list button next to the minimap.
+- **Addon Compartment** — the addon-list button next to the minimap, in retail and Forever.
+  The Classic games don't have one.
 
 ## What it moves
 
@@ -59,10 +60,21 @@ uses it, not just loot:
 Alerts stack upward from the anchor, the same way they always have. Forever uses the same
 alert frame, so whichever of these alerts Forever shows land on the anchor too.
 
+The Classic games send far fewer alerts through this frame. Loot never goes through it
+there, so what the anchor moves is mostly achievement toasts, in the games that have
+achievements. Classic Era has none, so very little appears there at all. `/ltm test` fires
+a real loot toast in every game, so you can always check the position.
+
 ## Requirements
 
-Retail, built for patch 12.1 (Midnight), and **World of Warcraft: Forever**. One download
-works in both: Forever runs on the retail game client and uses the same alert system.
+One download works in every version of World of Warcraft that Blizzard runs:
+
+- **Retail**, built for patch 12.1 (Midnight)
+- **World of Warcraft: Forever**
+- **Mists of Pandaria Classic**
+- **Classic Era**
+- **TBC Anniversary**
+- **Titan Reforged Classic** (China)
 
 Installing by hand for the Forever beta? Put the `LootToastMover` folder in
 `World of Warcraft/_classic_beta_/Interface/AddOns/`.

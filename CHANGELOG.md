@@ -3,6 +3,22 @@
 Notable changes to LootToastMover. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.13.0] - 2026-10-12
+
+### Added
+
+- **Now loads in every version of World of Warcraft that Blizzard runs.** Alongside retail
+  and Forever, the same download now covers Mists of Pandaria Classic, Classic Era,
+  TBC Anniversary and Titan Reforged Classic. The anchor box, `/ltm test`, the minimap
+  button, the options panel and the broker plugin all work the same in each of them, and
+  nothing changes for retail or Forever players.
+- The Classic games send far fewer alerts through the frame this addon moves. Loot never
+  goes through it there, so what the anchor moves is mostly achievement toasts, in the
+  games that have achievements. Classic Era has none, so very little appears there at all.
+  `/ltm test` fires a real loot toast in every game, so you can always check the position.
+- The Addon Compartment only exists in retail and Forever. In the Classic games, use the
+  minimap button, the options panel or `/ltm`.
+
 ## [4.12.0] - 2026-10-02
 
 ### Added
