@@ -9,19 +9,11 @@ local here = (arg and arg[0] or "tests/check_toc.lua"):match("^(.*)[/\\][^/\\]*$
 local ROOT = os.getenv("LTM_ADDON_DIR") or (here .. "/..")
 local TOC = ROOT .. "/LootToastMover.toc"
 
--- Patch 12.0 raised the floor for mainline addons to 120000. Sources disagree on whether
--- a lower number is merely flagged out of date or refused outright, but either way an
--- addon below this does not load for a normal user.
-local MIN_INTERFACE = 120000
-
---- Which of the addon's two games an Interface number is for, or nil for any other client.
---- Retail numbers have had six digits since 10.0. Forever's are 16xxx, which is also how
---- the BigWigs packager tells them apart when it tags the CurseForge upload. There is no
---- Forever floor to check: every Forever build so far is 1.60.1, Interface 16001.
-local function gameOf(interface)
-    if interface >= 100000 and interface <= 999999 then return "retail" end
-    if interface >= 16000 and interface <= 16999 then return "Forever" end
-end
+-- Which games the addon ships for, and how to tell their Interface numbers apart. Loaded
+-- from this checkout even when LTM_ADDON_DIR points at another one, so an older revision
+-- is judged against what the addon is meant to support now.
+package.path = here .. "/../tools/?.lua;" .. package.path
+local games = require("games")
 
 local problems = {}
 local function fail(msg) table.insert(problems, msg) end
@@ -46,8 +38,8 @@ for _, key in ipairs({ "Interface", "Title", "Version", "SavedVariables" }) do
     end
 end
 
--- One TOC serves both games by listing an Interface number for each. Every number has to
--- belong to one of them, retail's has to clear the floor, and neither game may go missing.
+-- One TOC serves every game by listing an Interface number for each. Every number has to
+-- belong to one of them, each has to clear its game's floor, and no game may go missing.
 -- The release workflow's Interface update rewrites this whole line from Blizzard's version
 -- servers, so a lookup that fails or returns some other game's build has to stop the
 -- release here rather than ship.
@@ -55,21 +47,22 @@ local interfaces, listed = {}, {}
 if directives.Interface and directives.Interface ~= "" then
     for entry in (directives.Interface .. ","):gmatch("([^,]*),") do
         local interface = tonumber(entry:match("^%s*(%d+)%s*$"))
-        local game = interface and gameOf(interface)
+        local game = interface and games.of(interface)
         if not interface then
             fail(("## Interface lists '%s', which is not a number"):format(entry))
         elseif not game then
-            fail(("## Interface %d is not a retail or Forever number, and the addon is "
-                .. "built for those two only"):format(interface))
-        elseif game == "retail" and interface < MIN_INTERFACE then
-            fail(("## Interface %d is below the %d floor for patch 12.x; the client will "
-                .. "not load the addon for a normal user"):format(interface, MIN_INTERFACE))
+            fail(("## Interface %d is not a number for any game the addon is built for; "
+                .. "add the game to tools/games.lua once the addon has been checked "
+                .. "against it"):format(interface))
+        elseif game.floor and interface < game.floor then
+            fail(("## Interface %d is below the %d floor for %s; the client will not load "
+                .. "the addon for a normal user"):format(interface, game.floor, game.name))
         end
         if interface then table.insert(interfaces, interface) end
         if game then listed[game] = true end
     end
-    for _, game in ipairs({ "retail", "Forever" }) do
-        if not listed[game] then fail("## Interface has no " .. game .. " number") end
+    for _, game in ipairs(games.list) do
+        if not listed[game] then fail("## Interface has no " .. game.name .. " number") end
     end
 end
 

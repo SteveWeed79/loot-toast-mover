@@ -13,12 +13,12 @@ name: Release
 #
 #   2. Push a v* tag by hand, which just packages and publishes that tag.
 #
-# Tick "update_interface" when a new game patch has landed: it pulls the current retail and
-# Forever Interface versions into the TOC as part of the release, rather than anyone
-# remembering the numbers. Being an expansion behind is what took this addon out of service
-# once already -- a 12.x client will not load anything below Interface 120000 -- but
-# noticing that and shipping to players are separate decisions, and this keeps the second
-# one yours.
+# Tick "update_interface" when a new game patch has landed: it pulls the current Interface
+# version of every game the addon supports into the TOC as part of the release, rather than
+# anyone remembering six numbers. Being an expansion behind is what took this addon out of
+# service once already -- a 12.x client will not load anything below Interface 120000 --
+# but noticing that and shipping to players are separate decisions, and this keeps the
+# second one yours.
 #
 # Bumping and publishing live in one job on purpose. Pushing a tag from a workflow does not
 # start another workflow, because GitHub does not trigger runs from events made with
@@ -42,7 +42,7 @@ on:
         required: false
         default: ""
       update_interface:
-        description: "Also pull the current retail and Forever Interface versions into the TOC"
+        description: "Also pull every game's current Interface version into the TOC"
         type: boolean
         required: false
         default: false
@@ -77,9 +77,17 @@ jobs:
       # now. If that ever yields another game's build, or nothing at all, the Tests step
       # (tests/check_toc.lua) fails the release before anything is tagged or published.
       #
+      # One line per game in tools/games.lua, in the same order, since that is the order
+      # the numbers are written back in. The names are the action's own: mists is
+      # Mists of Pandaria Classic, titan is Titan Reforged Classic (read from the China
+      # region, the only one it runs in), anniversary is TBC Anniversary, and vanilla is
+      # Classic Era. Never write classic_era for that last one. The action tests its
+      # "classic" pattern first, so classic_era quietly fetches Mists of Pandaria Classic
+      # again and Classic Era is left out.
+      #
       # The flavor list has to be a "|" block, not "|-". The action reads it line by line
       # and drops a final line with no newline after it, so "|-" would silently lose
-      # Forever.
+      # Classic Era.
       - name: Update the TOC Interface version
         if: inputs.update_interface
         uses: p3lim/toc-interface-updater@v4
@@ -87,6 +95,10 @@ jobs:
           flavor: |
             retail
             forever
+            mists
+            titan
+            anniversary
+            vanilla
 
       - name: Check what the Interface update changed
         if: inputs.update_interface

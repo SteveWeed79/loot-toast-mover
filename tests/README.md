@@ -47,6 +47,9 @@ LTM_ADDON_DIR=/tmp/ltm-old lua5.1 tests/run_tests.lua
 
 Against 4.8.3 every section fails; against the current tree all of them pass.
 
+`check_toc.lua` always takes the list of supported games from this checkout's
+`tools/games.lua`, so an older revision is judged against what the addon supports now.
+
 ## What each section guards
 
 | Section | Concern |
@@ -79,9 +82,11 @@ Against 4.8.3 every section fails; against the current tree all of them pass.
 
 `check_toc.lua` separately verifies:
 
-- `## Interface` lists a number for each game the addon ships for, retail and Forever
-  (`16xxx`), with retail's clearing the `120000` floor a 12.x client requires, and nothing
-  for any other client
+- `## Interface` lists a number for every game in `tools/games.lua` — retail, Forever,
+  Mists of Pandaria Classic, Titan Reforged Classic, TBC Anniversary and Classic Era — with
+  retail's clearing the `120000` floor a 12.x client requires, and nothing for any other
+  client. The ranges are the BigWigs packager's, since they decide which CurseForge game
+  version each number is uploaded under
 - the CurseForge project id is present and numeric
 - every file the TOC lists actually exists, with libraries ahead of the addon's own file
 - the compartment handlers named in the TOC resolve to functions in the Lua file

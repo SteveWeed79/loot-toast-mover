@@ -9,8 +9,9 @@
 --   minor   4.10.0 -> 4.11.0
 --   major   4.10.0 -> 5.0.0
 --
--- With no note, the entry is derived from the TOC's Interface version, which is what the
--- scheduled interface bump wants. Pass one explicitly for anything else.
+-- With no note, the entry names every game's version from the TOC's Interface line, which
+-- is what a release that only updates the Interface versions wants. Pass one explicitly for
+-- anything else.
 --
 -- Three things have to move together or tests/check_toc.lua fails the build:
 --   * ## Version in LootToastMover.toc
@@ -19,6 +20,9 @@
 
 local here = (arg and arg[0] or "tools/bump_version.lua"):match("^(.*)[/\\][^/\\]*$") or "."
 local ROOT = os.getenv("LTM_ADDON_DIR") or (here .. "/..")
+
+package.path = here .. "/?.lua;" .. package.path
+local games = require("games")
 
 local TOC = ROOT .. "/LootToastMover.toc"
 local LUA = ROOT .. "/LootToastMover.lua"
@@ -46,23 +50,18 @@ local function write(path, text)
     fh:close()
 end
 
---- "120105" -> "12.1.5". The last two digits are the patch, the two before that the minor,
---- and whatever remains the major.
-local function gameVersion(interface)
-    local digits = tostring(interface)
-    local patch = tonumber(digits:sub(-2))
-    local minor = tonumber(digits:sub(-4, -3))
-    local major = tonumber(digits:sub(1, -5))
-    if not (major and minor and patch) then return nil end
-    return ("%d.%d.%d"):format(major, minor, patch)
+--- "A", "A and B", "A, B and C".
+local function joinList(items)
+    if #items < 2 then return items[1] or "" end
+    return table.concat(items, ", ", 1, #items - 1) .. " and " .. items[#items]
 end
 
 local toc = read(TOC)
 
 local version = toc:match("##%s*Version:%s*([%d%.]+)")
 assert(version, "no ## Version in the TOC")
-local interface = toc:match("##%s*Interface:%s*(%d+)")
-assert(interface, "no ## Interface in the TOC")
+local interfaces = toc:match("##%s*Interface:([^\r\n]*)")
+assert(interfaces and interfaces:find("%d"), "no ## Interface in the TOC")
 
 -- Releasing what is already committed: report the version and change nothing.
 if kind == "none" then
@@ -98,9 +97,15 @@ write(LUA, luaOut)
 
 -- A changelog entry, inserted above the most recent existing one.
 if not note or note == "" then
-    local game = gameVersion(interface)
-    note = game and ("Updated for patch " .. game .. " (Interface `" .. interface .. "`).")
-        or ("Updated for Interface `" .. interface .. "`.")
+    -- "Retail 12.1.0", "Classic Era 1.15.9", ... in the TOC's own order. A number for no
+    -- known game is listed as it is; tests/check_toc.lua stops that release anyway.
+    local updated = {}
+    for interface in interfaces:gmatch("%d+") do
+        local game, gameVersion = games.of(interface), games.version(interface)
+        table.insert(updated, (game and gameVersion) and (game.name .. " " .. gameVersion)
+            or ("Interface `" .. interface .. "`"))
+    end
+    note = "Updated for the current version of every game: " .. joinList(updated) .. "."
 end
 
 local entry = ("## [%s] - %s\n\n### Changed\n\n- %s\n\n"):format(

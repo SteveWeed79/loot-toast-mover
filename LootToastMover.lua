@@ -74,8 +74,9 @@ anchor:SetClampedToScreen(true)
 anchor:SetMovable(true)
 anchor:EnableMouse(true)
 anchor:RegisterForDrag("LeftButton")
--- Toasts render at FULLSCREEN_DIALOG, so a live toast draws on top of this box rather than
--- disappearing behind it.
+-- Toasts render above this in every game -- FULLSCREEN_DIALOG in retail and Forever, DIALOG
+-- in the Classic games -- so a live toast draws on top of this box rather than disappearing
+-- behind it.
 anchor:SetFrameStrata("HIGH")
 
 anchor:SetBackdrop({
@@ -104,8 +105,9 @@ anchor:Hide()
 
 ------------------------------------------------ Helper to snap AlertFrame --------------------------
 -- Alerts anchor their BOTTOM to AlertFrame's BOTTOM and stack upward from there (see
--- AlertContainerMixin:UpdateAnchors and GetPointsForJustification). Lining AlertFrame's bottom
--- edge up with the box's means the first toast lands exactly on the box.
+-- AlertContainerMixin:UpdateAnchors and GetPointsForJustification, which retail and the
+-- Classic games implement the same way). Lining AlertFrame's bottom edge up with the box's
+-- means the first toast lands exactly on the box.
 local function SnapAlert()
     AlertFrame:ClearAllPoints()
     AlertFrame:SetPoint("BOTTOM", anchor, "BOTTOM", 0, 0)
@@ -264,8 +266,9 @@ local function BuildOptionsPanel()
         refreshOptions()
     end
 
-    -- Settings.RegisterAddOnCategory has been the way in since 10.0, and the TOC floor is
-    -- well past that; the guard is only so a stripped client cannot break the whole addon.
+    -- Settings.RegisterAddOnCategory has been the way in since 10.0, and every game the TOC
+    -- lists has it, the Classic ones included; the guard is only so a stripped client cannot
+    -- break the whole addon.
     if Settings and Settings.RegisterCanvasLayoutCategory then
         optionsCategory = Settings.RegisterCanvasLayoutCategory(panel, DISPLAY_NAME)
         -- Do NOT assign optionsCategory.ID here. The widely copied `category.ID = name`
@@ -432,7 +435,8 @@ end
 ------------------------------------------------ Addon Compartment ----------------------------------
 -- Registered declaratively from the TOC, which is why these have to be globals. Blizzard calls
 -- them as func(addonName, buttonName) and func(addonName, button); see
--- Blizzard_Minimap/Mainline/AddonCompartment.lua.
+-- Blizzard_Minimap/Mainline/AddonCompartment.lua. Only retail and Forever have a compartment.
+-- The Classic games ignore these TOC fields, and the minimap button covers the same ground.
 
 function LootToastMover_OnCompartmentClick(_, buttonName)
     if buttonName == "RightButton" then
