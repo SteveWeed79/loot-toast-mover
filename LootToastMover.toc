@@ -1,7 +1,7 @@
 ## Interface: 120100, 16001, 50504, 38002, 20506, 11509
 ## Title: LootToastMover
 ## Author: Steve Weed
-## Version: 4.13.0
+## Version: 4.14.0
 ## Notes: Moves loot toast alerts anywhere on screen.
 ## Notes-deDE: Verschiebt Beutemeldungen an eine beliebige Stelle auf dem Bildschirm.
 ## Notes-esES: Mueve las alertas de botín a cualquier lugar de la pantalla.
