@@ -3,7 +3,7 @@
 Notable changes to LootToastMover. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [4.14.0] - 2026-10-12
+## [4.14.0] - 2026-10-13
 
 ### Added
 
