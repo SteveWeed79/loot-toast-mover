@@ -133,14 +133,54 @@ translated as well.
 Slash commands and the addon's name stay in English in every language. WoW commands are
 typed in English in every client, and it keeps them the same in guides and bug reports.
 
-These translations are first drafts, not written by native speakers. Corrections are welcome
-as a GitHub issue or pull request.
+The translations in this repository are first drafts, not written by native speakers.
+Translators can improve them through the project's translation tool on CurseForge, and
+corrections are also welcome as a GitHub issue or pull request.
 
 Every string lives in [`Locales.lua`](Locales.lua): English first, then one table per
 language. A language that leaves a string out falls back to English, so a gap shows English
 rather than a blank. The tests still require every language to be complete, and every
-translation to keep its `%s` placeholders, its slash commands and the anchor text's line
-break. Adding a string therefore means adding it in every language at the same time.
+translation to keep its `%s` placeholders and its slash commands. Adding a string therefore
+means adding it in every language at the same time. No string contains a line break: the
+anchor box's two lines are two strings, which the code joins.
+
+### How CurseForge translations reach players
+
+`Locales.lua` ends with one packager line per CurseForge language:
+
+```lua
+do local L = translations.deDE --@localization(locale="deDE", format="lua_additive_table", handle-unlocalized="ignore")@
+end
+```
+
+In a copy from git that line is only a comment, so the drafts stand alone. When a release is
+packaged, the BigWigs packager replaces it with that language's translations from CurseForge,
+which are assigned over the drafts. Anything nobody has translated there is left out, so the
+draft stays. Latin American Spanish starts from the Spanish, CurseForge's improvements
+included, and then takes anything translated for it specifically.
+
+The release workflow makes that safe:
+
+1. It sends the English text to CurseForge (`tools/upload_translations.sh english`). This
+   uses CurseForge's `DeletePhrase` mode, so CurseForge always holds exactly the addon's
+   phrases: a new string reaches translators, and a removed one disappears there too.
+2. It packages the addon once without publishing, and runs the whole test suite against
+   that package. Translators' work never passes through this repository, so this is where
+   it gets checked. A translation that drops a `%s` or rewrites a slash command fails the
+   release before anything is tagged, and the failing check names the language and string to
+   fix on CurseForge.
+3. Only then does it tag and publish.
+
+To give translators the drafts to start from, run the **Translations** workflow once with
+**drafts**. It uploads the English, then each language's drafts, and finishes with the same
+package-and-test check a release makes, without publishing anything, which confirms the round
+trip works before a release depends on it. Don't run it with **drafts** again after
+translators have started: uploading a draft replaces whatever CurseForge holds for that
+phrase, their work included. The **english** option only sends the English, which every
+release does anyway.
+
+`tools/export_locale.lua <locale>` prints any language's strings in the form CurseForge
+imports. Both scripts need the `CF_API_KEY` secret the release already uses.
 
 ## Saved variables
 
@@ -203,9 +243,11 @@ Run the **Release** workflow from the Actions tab and pick a bump:
 | `major` | 4.11.1 → 5.0.0 |
 
 It bumps `## Version` in the TOC, the banner in `LootToastMover.lua` and `CHANGELOG.md`
-together, commits, tags, runs the tests, then publishes to CurseForge (project `1262382`)
-and GitHub releases. The optional **notes** input becomes the changelog line. Nothing ships
-if the tests fail, and it refuses to reuse an existing tag.
+together and runs the tests. It sends the English text to CurseForge's translation tool, then
+packages the addon with CurseForge's translations in it and tests that package (see
+[Translations](#translations)). Only then does it commit, tag, and publish to CurseForge
+(project `1262382`) and GitHub releases. The optional **notes** input becomes the changelog
+line. Nothing ships if any test fails, and it refuses to reuse an existing tag.
 
 Pushing a `v*` tag by hand also works and just packages that tag.
 
