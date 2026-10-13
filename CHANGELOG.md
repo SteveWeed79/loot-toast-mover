@@ -3,6 +3,19 @@
 Notable changes to LootToastMover. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.15.0] - 2026-10-13
+
+### Added
+
+- **Help translate LootToastMover.** Any translation can now be improved on CurseForge,
+  through the project's Localization page, and every release includes what translators have
+  written there. Until someone improves a string, you see the same translation as before.
+
+### Changed
+
+- The text on the anchor box now breaks after "Drag me." in every language, instead of in
+  the middle of the second sentence.
+
 ## [4.14.0] - 2026-10-13
 
 ### Added

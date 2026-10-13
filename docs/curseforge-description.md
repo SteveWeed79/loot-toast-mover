@@ -71,7 +71,8 @@ The anchor box, tooltips, options panel and chat messages appear in your game's 
 English, Deutsch, Español, Français, Italiano, Português, Русский, 한국어, 简体中文 and
 繁體中文. Slash commands like `/ltm test` stay the same in every language.
 
-Spot a clumsy translation? Suggest a better one on
+Spot a clumsy translation? Improve it on this project's Localization page here on CurseForge,
+and the next release will include it. You can also suggest a better one on
 [GitHub](https://github.com/SteveWeed79/loot-toast-mover/issues).
 
 ## Requirements

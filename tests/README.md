@@ -57,6 +57,16 @@ Against 4.8.3 every section fails; against the current tree all of them pass.
 `check_toc.lua` always takes the list of supported games from this checkout's
 `tools/games.lua`, so an older revision is judged against what the addon supports now.
 
+The release workflow uses the same variable to test the packaged build, which carries the
+translations made on CurseForge:
+
+```sh
+LTM_ADDON_DIR=.release/LootToastMover lua5.1 tests/run_tests.lua
+```
+
+That is where a translation that drops a `%s` or rewrites a slash command gets caught, since
+those never pass through the repository.
+
 ## What each section guards
 
 | Section | Concern |
@@ -86,13 +96,14 @@ Against 4.8.3 every section fails; against the current tree all of them pass.
 | Broker plugin is optional | The library is looked up, never bundled, so no broker bar must mean no error and no retry loop |
 | Slash command aliases | `/loottoastpos` is a lot to type for an addon nobody can find; `/ltm` has to keep working alongside it |
 | Every language translates every string, and nothing else | A string added in English alone would show English to everyone else, and a mistyped key is never read at all |
-| Translations keep placeholders, commands and line breaks | A lost `%s` makes `string.format` throw in game, a translated command points players at one that does not exist, and the anchor hint has to stay two lines to fit the box |
+| Translations keep placeholders, commands and line breaks | A lost `%s` makes `string.format` throw in game, a translated command points players at one that does not exist, and a line break would overflow the anchor box and may not survive CurseForge's translation tool |
 | English clients, and any language without a table, read English | `enGB` and any locale nobody translated must get English, not blanks |
 | A string a language has not translated falls back to English | The fallback is the safety net between a new string and its translations |
 | The code asks only for strings that exist, and uses all of them | A typo in `L.KEY` reads nil and shows nothing; an unused string costs translators work for nothing |
 | Every string the addon shows goes through the translations | Pseudo-localisation: every string comes back wrapped in markers, so any text without them was hardcoded in English where no translation can reach it. Covers the anchor box, options panel, tooltip and every chat message, failure paths included |
 | Each language shows its own text | End to end, for every language: the anchor box, options panel, tooltip and chat all read the translation |
 | Option buttons widen for a long translation, and stay one width | German, French and Russian labels run longer than English, and must not spill past the button edges |
+| The CurseForge export reads back as exactly the strings it came from | `tools/upload_translations.sh` sends this export to CurseForge, so every phrase has to arrive intact, quotes and all |
 | The addon list description is translated too | The addon list is the first place a player sees the addon |
 | The stub rejects widget methods that do not exist | Guards the stub's own strictness; nothing else would notice it being relaxed |
 

@@ -1,6 +1,6 @@
 
 ----------------------------------------------------------------------------------------------------
--- LootToastMover ▪ v4.14.0 --------------------------------------------------------------------------
+-- LootToastMover ▪ v4.15.0 --------------------------------------------------------------------------
 -- Re-anchors Blizzard's AlertFrame (loot toasts, achievements) to a draggable anchor box.
 ----------------------------------------------------------------------------------------------------
 local ADDON_NAME, ns = ...
@@ -99,7 +99,7 @@ local body = anchor:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 body:SetPoint("CENTER", 0, -2)
 -- A translation that runs long wraps inside the box instead of spilling past its edges.
 body:SetWidth(TOAST_WIDTH - 24)
-body:SetText(L.ANCHOR_HINT)
+body:SetText(L.ANCHOR_DRAG .. "\n" .. L.ANCHOR_LANDS)
 body:SetJustifyH("CENTER")
 
 local hint = anchor:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")

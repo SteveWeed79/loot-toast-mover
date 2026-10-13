@@ -594,9 +594,10 @@ test("Every language translates every string, and nothing else", function()
     end
 end)
 
--- Each of these has to come through translation unchanged: string.format fills in %s, the
--- commands are typed in English in every client, and the anchor hint's line break is what
--- keeps it inside a toast-sized box.
+-- Each of these has to come through translation unchanged: string.format fills in %s, and the
+-- commands are typed in English in every client. No English string has a line break, and a
+-- translation must not add one: the anchor box only has room for its two lines, and a newline
+-- may not survive CurseForge's translation tool.
 local MUST_SURVIVE = { "%s", "/ltm test", "/ltm reset", "/loottoastpos", "/ltm", "\n" }
 
 test("Translations keep placeholders, commands and line breaks", function()
@@ -725,7 +726,8 @@ test("Each language shows its own text", function()
         LootToastMover_OnCompartmentEnter("LootToastMover", { _name = "CompartmentButton" })
         _G.CHAT = {}
         SlashCmdList.LOOTTOASTPOS("reset")
-        check(L.ANCHOR_HINT ~= english.ANCHOR_HINT and shows(stub.texts(anchor), L.ANCHOR_HINT)
+        check(L.ANCHOR_DRAG ~= english.ANCHOR_DRAG
+                  and shows(stub.texts(anchor), L.ANCHOR_DRAG .. "\n" .. L.ANCHOR_LANDS)
                   and shows(panel, L.PANEL_INTRO) and shows(panel, L.BUTTON_TOGGLE)
                   and shows(panel, L.CHECK_MINIMAP) and GameTooltip.lines[2] == L.TOOLTIP_CLICK
                   and (_G.CHAT[1] or ""):find(L.POSITION_RESET, 1, true) ~= nil,
@@ -750,6 +752,36 @@ test("Option buttons widen for a long translation, and stay one width", function
         if locale == "enUS" then
             check(buttons[1]:GetWidth() == 200, "English keeps the original 200 wide buttons")
         end
+    end
+end)
+
+-- tools/upload_translations.sh sends this export to CurseForge, so it has to come back as
+-- exactly the strings it was made from: every phrase, nothing mangled on the way.
+test("The CurseForge export reads back as exactly the strings it came from", function()
+    local lua = arg and arg[-1] or "lua5.1"
+    local exporter = here .. "/../tools/export_locale.lua"
+    for _, locale in ipairs({ "enUS", unpack(LANGUAGES) }) do
+        local L, english = stringsFor(locale)
+        local expected = locale == "enUS" and english or L
+        local pipe = assert(io.popen(("%s %q %s"):format(lua, exporter, locale)))
+        local exported = pipe:read("*a")
+        pipe:close()
+        -- Load the export as CurseForge would read it: assignments into a table named L.
+        local loaded = {}
+        local chunk = loadstring(exported)
+        local ok = chunk ~= nil
+        if ok then
+            setfenv(chunk, { L = loaded })
+            ok = pcall(chunk)
+        end
+        local same = ok and next(loaded) ~= nil
+        for key, text in pairs(expected) do
+            if loaded[key] ~= text then same = false end
+        end
+        for key in pairs(loaded) do
+            if rawget(expected, key) == nil then same = false end
+        end
+        check(same, locale .. " exports every phrase exactly, and loads back as Lua")
     end
 end)
 

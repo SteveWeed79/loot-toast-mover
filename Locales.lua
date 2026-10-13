@@ -4,17 +4,25 @@
 -- English is the source of every string. Each other language replaces what it translates, and
 -- anything it leaves out falls back to English rather than showing nothing.
 --
+-- The translations here are drafts. Translators can improve them on CurseForge, and a packaged
+-- release swaps their work in over the drafts (see the end of this file). The English is
+-- uploaded to CurseForge from here as part of every release, so this file stays the source of
+-- what there is to translate.
+--
 -- When translating:
 --   * Keep every %s. The code fills them in, so each language needs the same number of them.
 --   * Keep slash commands (/ltm, /ltm test, /ltm reset, /loottoastpos) exactly as they are.
 --     They are typed in English in every client.
---   * ANCHOR_HINT sits on a box the size of a loot toast, so keep it to two short lines.
+--   * ANCHOR_DRAG and ANCHOR_LANDS are the two lines on a box the size of a loot toast, so
+--     keep each one short. No string contains a line break, which keeps them safe to send
+--     through CurseForge's translation tool.
 --   * Chat messages follow a "[LootToastMover]" prefix, so they can read as a fragment.
 local _, ns = ...
 
 local enUS = {
     -- The anchor box itself.
-    ANCHOR_HINT = "Drag me. Toasts appear\nin this exact space.",
+    ANCHOR_DRAG = "Drag me.",
+    ANCHOR_LANDS = "Toasts appear in this exact space.",
 
     -- Tooltip on the minimap button, the broker plugin and the Addon Compartment.
     TOOLTIP_CLICK = "Click to show or hide the anchor box",
@@ -51,7 +59,8 @@ local enUS = {
 
 local translations = {
     deDE = {
-        ANCHOR_HINT = "Zum Verschieben ziehen.\nMeldungen erscheinen genau hier.",
+        ANCHOR_DRAG = "Zum Verschieben ziehen.",
+        ANCHOR_LANDS = "Meldungen erscheinen genau hier.",
         TOOLTIP_CLICK = "Klicken, um den Ankerrahmen ein- oder auszublenden",
         TOOLTIP_RIGHT_CLICK = "Rechtsklick für Optionen",
         TOOLTIP_TEST = "Beispielmeldung anzeigen",
@@ -79,7 +88,8 @@ local translations = {
     },
 
     esES = {
-        ANCHOR_HINT = "Arrástrame. Las alertas aparecen\njusto en este espacio.",
+        ANCHOR_DRAG = "Arrástrame.",
+        ANCHOR_LANDS = "Las alertas aparecen justo en este espacio.",
         TOOLTIP_CLICK = "Haz clic para mostrar u ocultar el marco de anclaje",
         TOOLTIP_RIGHT_CLICK = "Clic derecho para las opciones",
         TOOLTIP_TEST = "mostrar una alerta de ejemplo",
@@ -107,7 +117,8 @@ local translations = {
     },
 
     frFR = {
-        ANCHOR_HINT = "Faites-moi glisser. Les alertes\napparaissent exactement ici.",
+        ANCHOR_DRAG = "Faites-moi glisser.",
+        ANCHOR_LANDS = "Les alertes apparaissent exactement ici.",
         TOOLTIP_CLICK = "Cliquez pour afficher ou masquer le cadre d'ancrage",
         TOOLTIP_RIGHT_CLICK = "Clic droit pour les options",
         TOOLTIP_TEST = "afficher une alerte d'exemple",
@@ -135,7 +146,8 @@ local translations = {
     },
 
     itIT = {
-        ANCHOR_HINT = "Trascinami. Gli avvisi appaiono\nesattamente in questo punto.",
+        ANCHOR_DRAG = "Trascinami.",
+        ANCHOR_LANDS = "Gli avvisi appaiono esattamente in questo punto.",
         TOOLTIP_CLICK = "Clicca per mostrare o nascondere il riquadro di ancoraggio",
         TOOLTIP_RIGHT_CLICK = "Clic destro per le opzioni",
         TOOLTIP_TEST = "mostra un avviso di esempio",
@@ -163,7 +175,8 @@ local translations = {
     },
 
     koKR = {
-        ANCHOR_HINT = "끌어서 옮기세요. 알림이\n정확히 이 자리에 나타납니다.",
+        ANCHOR_DRAG = "끌어서 옮기세요.",
+        ANCHOR_LANDS = "알림이 정확히 이 자리에 나타납니다.",
         TOOLTIP_CLICK = "클릭하여 앵커 상자 표시/숨기기",
         TOOLTIP_RIGHT_CLICK = "오른쪽 클릭하여 설정 열기",
         TOOLTIP_TEST = "예시 알림 표시",
@@ -191,7 +204,8 @@ local translations = {
     },
 
     ptBR = {
-        ANCHOR_HINT = "Arraste-me. Os alertas aparecem\nexatamente neste espaço.",
+        ANCHOR_DRAG = "Arraste-me.",
+        ANCHOR_LANDS = "Os alertas aparecem exatamente neste espaço.",
         TOOLTIP_CLICK = "Clique para mostrar ou ocultar a caixa de ancoragem",
         TOOLTIP_RIGHT_CLICK = "Clique com o botão direito para as opções",
         TOOLTIP_TEST = "mostrar um alerta de exemplo",
@@ -219,7 +233,8 @@ local translations = {
     },
 
     ruRU = {
-        ANCHOR_HINT = "Перетащите меня. Уведомления\nпоявятся именно здесь.",
+        ANCHOR_DRAG = "Перетащите меня.",
+        ANCHOR_LANDS = "Уведомления появятся именно здесь.",
         TOOLTIP_CLICK = "Щелкните, чтобы показать или скрыть рамку привязки",
         TOOLTIP_RIGHT_CLICK = "Правый щелчок: настройки",
         TOOLTIP_TEST = "показать пример уведомления",
@@ -247,7 +262,8 @@ local translations = {
     },
 
     zhCN = {
-        ANCHOR_HINT = "拖动我来调整位置。\n提示会准确地显示在这里。",
+        ANCHOR_DRAG = "拖动我来调整位置。",
+        ANCHOR_LANDS = "提示会准确地显示在这里。",
         TOOLTIP_CLICK = "点击显示或隐藏锚点框",
         TOOLTIP_RIGHT_CLICK = "右键点击打开设置",
         TOOLTIP_TEST = "显示示例提示",
@@ -275,7 +291,8 @@ local translations = {
     },
 
     zhTW = {
-        ANCHOR_HINT = "拖曳我來調整位置。\n提示會準確地顯示在這裡。",
+        ANCHOR_DRAG = "拖曳我來調整位置。",
+        ANCHOR_LANDS = "提示會準確地顯示在這裡。",
         TOOLTIP_CLICK = "點擊顯示或隱藏錨點框",
         TOOLTIP_RIGHT_CLICK = "右鍵點擊開啟設定",
         TOOLTIP_TEST = "顯示範例提示",
@@ -303,8 +320,38 @@ local translations = {
     },
 }
 
--- The same language in another region's client. Close enough that sharing beats English.
-translations.esMX = translations.esES
+-- Translations made on CurseForge. When a release is packaged, the packager replaces each
+-- @localization line below with that language's translations from CurseForge, written as
+-- L["KEY"] = "text" and assigned over the draft above. Anything nobody has translated there is
+-- left out, so the draft stands. In a copy straight from git each line is only a comment.
+do local L = translations.deDE --@localization(locale="deDE", format="lua_additive_table", handle-unlocalized="ignore")@
+end
+do local L = translations.esES --@localization(locale="esES", format="lua_additive_table", handle-unlocalized="ignore")@
+end
+do local L = translations.frFR --@localization(locale="frFR", format="lua_additive_table", handle-unlocalized="ignore")@
+end
+do local L = translations.itIT --@localization(locale="itIT", format="lua_additive_table", handle-unlocalized="ignore")@
+end
+do local L = translations.koKR --@localization(locale="koKR", format="lua_additive_table", handle-unlocalized="ignore")@
+end
+do local L = translations.ptBR --@localization(locale="ptBR", format="lua_additive_table", handle-unlocalized="ignore")@
+end
+do local L = translations.ruRU --@localization(locale="ruRU", format="lua_additive_table", handle-unlocalized="ignore")@
+end
+do local L = translations.zhCN --@localization(locale="zhCN", format="lua_additive_table", handle-unlocalized="ignore")@
+end
+do local L = translations.zhTW --@localization(locale="zhTW", format="lua_additive_table", handle-unlocalized="ignore")@
+end
+
+-- Latin American Spanish starts from the Spanish above, CurseForge's improvements included, and
+-- then takes anything translated for its own client specifically.
+local esMX = {}
+for key, text in pairs(translations.esES) do esMX[key] = text end
+translations.esMX = esMX
+do local L = translations.esMX --@localization(locale="esMX", format="lua_additive_table", handle-unlocalized="ignore")@
+end
+
+-- CurseForge has no European Portuguese, so that client reads the Brazilian text as it stands.
 translations.ptPT = translations.ptBR
 
 -- enUS and enGB have no table of their own, so they get English straight through.

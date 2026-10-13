@@ -1,0 +1,56 @@
+name: Translations
+
+# Sends the addon's strings to CurseForge's translation tool, where translators can improve the
+# drafts in Locales.lua. Every release packages their work in. Manual only, like the release.
+#
+#   english  The English phrases. Every release already does this, so it is only needed to put a
+#            new string in front of translators before the next release.
+#   drafts   The English phrases, then this repository's draft translation of each one in every
+#            language. This replaces whatever CurseForge holds for those phrases, translators'
+#            work included, so it is for seeding the project once and not for later.
+#
+# Needs the CF_API_KEY secret the release already uses. See tools/upload_translations.sh.
+
+on:
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: "What to send"
+        type: choice
+        required: true
+        default: english
+        options: [english, drafts]
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    name: Upload to CurseForge
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone project
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # full history, as the packager expects
+
+      - name: Install Lua 5.1
+        run: sudo apt-get update && sudo apt-get install -y lua5.1
+
+      - name: Upload
+        run: bash tools/upload_translations.sh "${{ inputs.upload }}"
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+
+      # The check every release makes, without publishing anything: package the addon with
+      # CurseForge's translations in and test what players would get. Running it here proves the
+      # round trip works, for every language, before a release depends on it.
+      - name: Package without publishing
+        uses: BigWigsMods/packager@v2
+        with:
+          args: -d
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+
+      - name: Test the packaged build
+        run: LTM_ADDON_DIR=.release/LootToastMover lua5.1 tests/run_tests.lua
