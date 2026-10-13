@@ -13,7 +13,7 @@ Both exit non-zero on failure. WoW runs Lua 5.1, so the tests do too.
 
 | File | Purpose |
 | --- | --- |
-| `wow_stub.lua` | Minimal emulation of the WoW API — frames, events, timers, `GameTooltip`, `Minimap`, the `Settings` panel registry, the cursor, and the chat `print` |
+| `wow_stub.lua` | Minimal emulation of the WoW API — frames, events, timers, `GameTooltip`, `Minimap`, the `Settings` panel registry, the cursor, the chat `print`, `GetLocale`, and the text each widget shows |
 | `run_tests.lua` | Behavioural test sections |
 | `check_toc.lua` | Static checks on `LootToastMover.toc` |
 
@@ -33,7 +33,14 @@ place before loading, standing in for the copy a broker display embeds, so the b
 sections can test both worlds.
 
 Files are loaded in the order the `.toc` lists them, read from the `.toc` itself, because
-load order was the cause of a real bug.
+load order was the cause of a real bug. As in the client, each file gets the addon's name and
+one table that all of them share, which is how `LootToastMover.lua` reads the strings
+`Locales.lua` builds.
+
+The stub keeps the text set on every widget, and remembers which font strings and child
+frames belong to which frame. `stub.texts(frame)` then returns everything a frame shows,
+which is how the translation sections check what a player would actually read. Set
+`stub.locale`, or pass `locale` to `loadAddon`, to play the addon in another language.
 
 ## Running against another revision
 
@@ -78,6 +85,15 @@ Against 4.8.3 every section fails; against the current tree all of them pass.
 | Broker plugin | Broker bars only show addons that register a LibDataBroker object, and this one registered none |
 | Broker plugin is optional | The library is looked up, never bundled, so no broker bar must mean no error and no retry loop |
 | Slash command aliases | `/loottoastpos` is a lot to type for an addon nobody can find; `/ltm` has to keep working alongside it |
+| Every language translates every string, and nothing else | A string added in English alone would show English to everyone else, and a mistyped key is never read at all |
+| Translations keep placeholders, commands and line breaks | A lost `%s` makes `string.format` throw in game, a translated command points players at one that does not exist, and the anchor hint has to stay two lines to fit the box |
+| English clients, and any language without a table, read English | `enGB` and any locale nobody translated must get English, not blanks |
+| A string a language has not translated falls back to English | The fallback is the safety net between a new string and its translations |
+| The code asks only for strings that exist, and uses all of them | A typo in `L.KEY` reads nil and shows nothing; an unused string costs translators work for nothing |
+| Every string the addon shows goes through the translations | Pseudo-localisation: every string comes back wrapped in markers, so any text without them was hardcoded in English where no translation can reach it. Covers the anchor box, options panel, tooltip and every chat message, failure paths included |
+| Each language shows its own text | End to end, for every language: the anchor box, options panel, tooltip and chat all read the translation |
+| Option buttons widen for a long translation, and stay one width | German, French and Russian labels run longer than English, and must not spill past the button edges |
+| The addon list description is translated too | The addon list is the first place a player sees the addon |
 | The stub rejects widget methods that do not exist | Guards the stub's own strictness; nothing else would notice it being relaxed |
 
 `check_toc.lua` separately verifies:
@@ -89,6 +105,7 @@ Against 4.8.3 every section fails; against the current tree all of them pass.
   version each number is uploaded under
 - the CurseForge project id is present and numeric
 - every file the TOC lists actually exists, with libraries ahead of the addon's own file
+- `Locales.lua` is listed before `LootToastMover.lua`, which reads its strings as it loads
 - the compartment handlers named in the TOC resolve to functions in the Lua file
 - `## Version` has not drifted from the banner in `LootToastMover.lua`
 - `.pkgmeta` names a `manual-changelog` file that exists, and that `CHANGELOG.md` has an

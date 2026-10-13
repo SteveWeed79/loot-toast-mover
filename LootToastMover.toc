@@ -1,8 +1,19 @@
 ## Interface: 120100, 16001, 50504, 38002, 20506, 11509
 ## Title: LootToastMover
 ## Author: Steve Weed
-## Version: 4.13.0
+## Version: 4.14.0
 ## Notes: Moves loot toast alerts anywhere on screen.
+## Notes-deDE: Verschiebt Beutemeldungen an eine beliebige Stelle auf dem Bildschirm.
+## Notes-esES: Mueve las alertas de botín a cualquier lugar de la pantalla.
+## Notes-esMX: Mueve las alertas de botín a cualquier lugar de la pantalla.
+## Notes-frFR: Déplace les alertes de butin n'importe où sur l'écran.
+## Notes-itIT: Sposta gli avvisi di bottino in qualsiasi punto dello schermo.
+## Notes-koKR: 전리품 알림을 화면 어디로든 옮길 수 있습니다.
+## Notes-ptBR: Move os alertas de saque para qualquer lugar da tela.
+## Notes-ptPT: Move os alertas de saque para qualquer lugar da tela.
+## Notes-ruRU: Перемещает уведомления о добыче в любое место экрана.
+## Notes-zhCN: 将战利品提示移动到屏幕上的任意位置。
+## Notes-zhTW: 將戰利品提示移動到螢幕上的任意位置。
 ## IconTexture: Interface\Icons\inv_misc_bag_10
 ## SavedVariables: LootToastMoverDB
 ## AddonCompartmentFunc: LootToastMover_OnCompartmentClick
@@ -11,4 +22,5 @@
 ## X-License: MIT
 ## X-Curse-Project-ID: 1262382
 
+Locales.lua
 LootToastMover.lua

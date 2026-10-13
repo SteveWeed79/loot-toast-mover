@@ -34,7 +34,8 @@ The release zip already contains a correctly named `LootToastMover/` folder. If 
 from a git checkout instead, the folder **must** be named `LootToastMover` — the
 repository directory name (`loot-toast-mover`) will not load.
 
-The addon is a single Lua file with no third-party dependencies.
+The addon is two Lua files, its code and its translations, with no third-party
+dependencies.
 
 ## Usage
 
@@ -119,6 +120,27 @@ Classic.
 Patch 12.0 raised the floor for mainline addons to `120000`, so the retail number has to be
 kept current, and the others have to track their clients the same way. Check the live value
 in any game with `/dump select(4, GetBuildInfo())`.
+
+## Translations
+
+The addon's own text follows the game client's language. That covers the anchor box, the
+tooltips, the options panel and the chat messages. Besides English it has German, French,
+Spanish, Italian, Portuguese, Russian, Korean, and Simplified and Traditional Chinese. The
+Latin American Spanish client shares the Spanish text, and the European Portuguese client
+shares the Brazilian Portuguese text. The one-line description in the in-game addon list is
+translated as well.
+
+Slash commands and the addon's name stay in English in every language. WoW commands are
+typed in English in every client, and it keeps them the same in guides and bug reports.
+
+These translations are first drafts, not written by native speakers. Corrections are welcome
+as a GitHub issue or pull request.
+
+Every string lives in [`Locales.lua`](Locales.lua): English first, then one table per
+language. A language that leaves a string out falls back to English, so a gap shows English
+rather than a blank. The tests still require every language to be complete, and every
+translation to keep its `%s` placeholders, its slash commands and the anchor text's line
+break. Adding a string therefore means adding it in every language at the same time.
 
 ## Saved variables
 

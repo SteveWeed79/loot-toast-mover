@@ -3,6 +3,20 @@
 Notable changes to LootToastMover. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.14.0] - 2026-10-13
+
+### Added
+
+- **LootToastMover now speaks your language.** The anchor box, the tooltips, the options
+  panel and the chat messages follow your game client's language: German, French, Spanish,
+  Italian, Portuguese, Russian, Korean, and Simplified and Traditional Chinese, as well as
+  English. The description in the in-game addon list is translated too, and the options
+  panel's buttons widen to fit a longer translation.
+- Slash commands stay the same in every language, so `/ltm test` and the rest work exactly
+  as before.
+- These translations are first drafts, not written by native speakers. If something reads
+  awkwardly in your language, suggest a better wording on GitHub.
+
 ## [4.13.0] - 2026-10-12
 
 ### Added

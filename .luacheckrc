@@ -24,6 +24,7 @@ read_globals = {
     "CreateFrame",
     "GameTooltip",
     "GetCursorPosition",
+    "GetLocale",       -- the client's text language, which picks the translation
     "Item",            -- ItemMixin factory, for loading the sample item
     "LibStub",         -- only ever looked up, never bundled; see the broker section
     "LootAlertSystem", -- Blizzard's loot toast subsystem
@@ -32,6 +33,12 @@ read_globals = {
     "UIParent",
     "hooksecurefunc",
     "strtrim",
+}
+
+-- Each translated sentence stays on one line, so a translator sees the whole thing at once
+-- rather than reassembling it from concatenated pieces.
+files["Locales.lua"] = {
+    max_line_length = false,
 }
 
 -- The test harness defines stand-ins for the whole client, so it plays by looser rules.

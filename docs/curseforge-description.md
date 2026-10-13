@@ -65,6 +65,15 @@ there, so what the anchor moves is mostly achievement toasts, in the games that 
 achievements. Classic Era has none, so very little appears there at all. `/ltm test` fires
 a real loot toast in every game, so you can always check the position.
 
+## Languages
+
+The anchor box, tooltips, options panel and chat messages appear in your game's language:
+English, Deutsch, Español, Français, Italiano, Português, Русский, 한국어, 简体中文 and
+繁體中文. Slash commands like `/ltm test` stay the same in every language.
+
+Spot a clumsy translation? Suggest a better one on
+[GitHub](https://github.com/SteveWeed79/loot-toast-mover/issues).
+
 ## Requirements
 
 One download works in every version of World of Warcraft that Blizzard runs:
@@ -79,9 +88,10 @@ One download works in every version of World of Warcraft that Blizzard runs:
 Installing by hand for the Forever beta? Put the `LootToastMover` folder in
 `World of Warcraft/_classic_beta_/Interface/AddOns/`.
 
-**No dependencies.** The addon is a single Lua file. The minimap button is written directly
-against the game's widget API, and the broker plugin uses the LibDataBroker your broker
-display already loads, so nothing is bundled and nothing is duplicated.
+**No dependencies.** The addon is two small Lua files: its code and its translations. The
+minimap button is written directly against the game's widget API, and the broker plugin uses
+the LibDataBroker your broker display already loads, so nothing is bundled and nothing is
+duplicated.
 
 ## Upgrading from an older version
 
