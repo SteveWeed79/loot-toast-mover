@@ -84,12 +84,17 @@ Interface number for each, and a client loads the addon as long as one of them i
 
 | Game | Interface | Version |
 | --- | --- | --- |
-| Retail (Midnight) | `120100` | 12.1.0 |
+| Retail (Midnight) | `120105`, `120100` | 12.1.5, 12.1.0 |
 | World of Warcraft: Forever | `16001` | 1.60.1 |
 | Mists of Pandaria Classic | `50504` | 5.5.4 |
 | Titan Reforged Classic (China only) | `38002` | 3.80.2 |
 | TBC Anniversary | `20506` | 2.5.6 |
 | Classic Era | `11509` | 1.15.9 |
+
+Retail lists two numbers while patch 12.1.5 rolls out. Regions patch on different days, so
+for a while some clients are still on 12.1.0, and each needs its own number to load the
+addon. The release workflow's Interface update writes one number per game, so the next one
+drops `120100`.
 
 [`tools/games.lua`](tools/games.lua) is the same list in code; the TOC check and the
 release tooling both work from it.
