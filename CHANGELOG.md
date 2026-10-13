@@ -3,6 +3,13 @@
 Notable changes to LootToastMover. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.15.1] - 2026-10-13
+
+### Changed
+
+- **Updated for patch 12.1.5**, so the game does not flag the addon as out of date. Regions
+  that patch later in the week keep loading it on 12.1.0 until they update.
+
 ## [4.15.0] - 2026-10-13
 
 ### Added
