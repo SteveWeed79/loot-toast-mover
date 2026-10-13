@@ -39,6 +39,9 @@ read_globals = {
 -- rather than reassembling it from concatenated pieces.
 files["Locales.lua"] = {
     max_line_length = false,
+    -- Each `do local L = …` block receives CurseForge's translations only when the packager
+    -- fills it in. In the repository the L there is unused by design.
+    ignore = { "211/L" },
 }
 
 -- The test harness defines stand-ins for the whole client, so it plays by looser rules.

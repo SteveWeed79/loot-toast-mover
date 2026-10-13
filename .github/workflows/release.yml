@@ -20,6 +20,9 @@ name: Release
 # but noticing that and shipping to players are separate decisions, and this keeps the
 # second one yours.
 #
+# Every release also sends the English text to CurseForge's translation tool and tests the
+# packaged build, which carries the translations made there, before tagging anything.
+#
 # Bumping and publishing live in one job on purpose. Pushing a tag from a workflow does not
 # start another workflow, because GitHub does not trigger runs from events made with
 # GITHUB_TOKEN, so a job that only tagged would appear to succeed and publish nothing.
@@ -134,6 +137,29 @@ jobs:
         run: |
           lua5.1 tests/run_tests.lua
           lua5.1 tests/check_toc.lua
+
+      # Locales.lua is the source of every phrase. Sending the English to CurseForge's
+      # translation tool before each release is how a new string reaches the translators, and
+      # how a removed one stops being translated. See tools/upload_translations.sh.
+      - name: Send the English text to CurseForge's translators
+        run: bash tools/upload_translations.sh english
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+
+      # The packager swaps CurseForge's translations in over Locales.lua's drafts, so the zip
+      # carries text that never passed through this repository or its tests. Build it once
+      # without publishing, then test exactly what players would get, before anything is tagged:
+      # a translation that drops a %s or rewrites a slash command stops the release here, and
+      # the failing check names the language and the string to fix on CurseForge.
+      - name: Package without publishing
+        uses: BigWigsMods/packager@v2
+        with:
+          args: -d
+        env:
+          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+
+      - name: Test the packaged build
+        run: LTM_ADDON_DIR=.release/LootToastMover lua5.1 tests/run_tests.lua
 
       - name: Commit, tag and push
         if: github.event_name != 'push'

@@ -25,6 +25,11 @@ jobs:
       - name: Luacheck
         run: luacheck .
 
+      # tools/upload_translations.sh runs in every release, so a mistake in it should show up
+      # here rather than halfway through publishing.
+      - name: Shellcheck
+        run: shellcheck tools/*.sh
+
       - name: Tests
         run: lua5.1 tests/run_tests.lua
 
