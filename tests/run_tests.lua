@@ -59,6 +59,8 @@ local loadedNamespace
 --- Load the addon the way the client would: every file the TOC lists, in order.
 -- @param opts.savedVars a table to install as LootToastMoverDB before loading
 -- @param opts.broker install LibStub + LibDataBroker first, as a broker display would
+-- @param opts.compartment give the client an Addon Compartment, as retail and Forever have
+-- @param opts.before runs after the stub is reset and before the addon's files load
 -- @param opts.locale the client language GetLocale reports, "enUS" if not given
 -- @param opts.wrapStrings replaces the string table once Locales.lua has built it
 -- @return the anchor frame, or nil plus the error that stopped the load
@@ -68,6 +70,8 @@ local function loadAddon(opts)
     if opts.locale then stub.locale = opts.locale end
     if opts.savedVars then _G.LootToastMoverDB = opts.savedVars end
     if opts.broker then InstallBrokerLibs() end
+    if opts.compartment then _G.AddonCompartmentFrame = {} end
+    if opts.before then opts.before() end
 
     local namespace = {}
     loadedNamespace = namespace
@@ -87,6 +91,13 @@ local function loadAddon(opts)
     TickAll(3)
     _G.CHAT = {}
     return _G.LootToastMoverAnchor
+end
+
+--- Leave a frame where a drag would: the client's StartMoving/StopMovingOrSizing replaces a
+--- frame's points with a single one, so the old points are cleared first.
+local function moveTo(frame, x, y)
+    frame:ClearAllPoints()
+    frame:SetPoint("CENTER", UIParent, "CENTER", x, y)
 end
 
 --- loadAddon, raising a readable error when the addon does not load.
@@ -157,7 +168,7 @@ end)
 ------------------------------------------------------------------------------------------
 test("Anchor position round-trips through SavedVariables", function()
     local anchor = mustLoad()
-    anchor:SetPoint("CENTER", UIParent, "CENTER", 123, -45)
+    moveTo(anchor, 123, -45)
     local onDragStop = anchor:GetScript("OnDragStop")
     check(onDragStop ~= nil, "OnDragStop handler is installed")
     onDragStop(anchor)
@@ -175,7 +186,7 @@ end)
 -- Regression: OnDragStop replaced the whole LootToastMoverDB table, and reset wiped it.
 test("Reset clears only the anchor position", function()
     local anchor = mustLoad()
-    anchor:SetPoint("CENTER", UIParent, "CENTER", 10, 20)
+    moveTo(anchor, 10, 20)
     anchor:GetScript("OnDragStop")(anchor)
     check(LootToastMoverDB.point == "CENTER", "position saved before reset")
 
@@ -200,7 +211,7 @@ end)
 -- toggled the anchor instead of resetting, and unknown input gave no feedback at all.
 test("Slash argument parsing", function()
     local anchor = mustLoad()
-    anchor:SetPoint("CENTER", UIParent, "CENTER", 1, 2)
+    moveTo(anchor, 1, 2)
     anchor:GetScript("OnDragStop")(anchor)
 
     SlashCmdList.LOOTTOASTPOS("  RESET  ")
@@ -484,7 +495,7 @@ test("Options panel callbacks", function()
     check(type(panel.OnCommit) == "function", "OnCommit is defined")
     check(type(panel.OnDefault) == "function", "OnDefault is defined")
 
-    anchor:SetPoint("CENTER", UIParent, "CENTER", 300, 300)
+    moveTo(anchor, 300, 300)
     anchor:GetScript("OnDragStop")(anchor)
     SlashCmdList.LOOTTOASTPOS("minimap")
     check(LootToastMoverDB.point == "CENTER" and LootToastMoverDB.minimapButton.hide == true,
@@ -794,6 +805,285 @@ test("The addon list description is translated too", function()
     for _, locale in ipairs(LANGUAGES) do
         check((notes[locale] or "") ~= "", "## Notes-" .. locale .. " is there")
     end
+end)
+
+------------------------------------------------------------------------------------------
+-- A saved position is handed to SetPoint, which raises on anything it does not recognise.
+-- Unchecked, a damaged saved-variables file raised at every login and skipped everything
+-- the load handler does after placing the box, the minimap button included.
+test("A damaged saved position falls back to the default instead of raising", function()
+    local cases = {
+        { "a point that is not one",
+          { point = "MIDDLE", relPoint = "CENTER", xOfs = 1, yOfs = 2, schema = 2 } },
+        { "a relative point that is not one",
+          { point = "CENTER", relPoint = 7, xOfs = 1, yOfs = 2, schema = 2 } },
+        { "an offset that is text",
+          { point = "CENTER", relPoint = "CENTER", xOfs = "left", yOfs = 2, schema = 2 } },
+        { "an offset that is not a number",
+          { point = "CENTER", relPoint = "CENTER", xOfs = 0 / 0, yOfs = 2, schema = 2 } },
+        { "an infinite offset",
+          { point = "CENTER", relPoint = "CENTER", xOfs = 1, yOfs = math.huge, schema = 2 } },
+    }
+    for _, case in ipairs(cases) do
+        local anchor, err = loadAddon({ savedVars = case[2] })
+        if check(anchor ~= nil, case[1] .. ": the addon still loads") then
+            check(anchor:GetPoint() == "TOP", case[1] .. ": the box is at its default position")
+            check(LootToastMoverDB.point == nil, case[1] .. ": the bad position is dropped")
+            check(#ERRORS == 0, case[1] .. ": no error is raised")
+            check(LootToastMoverMinimapButton:IsShown(), case[1] .. ": the minimap button is still set up")
+        else
+            print("          " .. tostring(err))
+        end
+    end
+
+    -- Good positions are untouched, and a lower-case point is tidied rather than thrown away.
+    local anchor = mustLoad({ savedVars = { point = "bottomleft", xOfs = 40, yOfs = 60, schema = 2 } })
+    local point, _, relPoint, x, y = anchor:GetPoint()
+    check(point == "BOTTOMLEFT" and relPoint == "BOTTOMLEFT" and x == 40 and y == 60,
+          "a usable position survives, whatever its case")
+
+    -- Saved variables that are not a table at all, or hold a broken minimap table.
+    check(loadAddon({ before = function() _G.LootToastMoverDB = "oops" end }) ~= nil,
+          "saved variables that are not a table are started again")
+    mustLoad({ savedVars = { minimapButton = { angle = 0 / 0, hide = "yes" }, schema = 2 } })
+    check(LootToastMoverDB.minimapButton.angle == 198 and LootToastMoverDB.minimapButton.hide == false,
+          "a broken minimap entry goes back to its defaults")
+end)
+
+------------------------------------------------------------------------------------------
+-- The saved variables used to be re-checked and re-migrated on every read, once per frame
+-- while the minimap button was being dragged.
+test("Saved variables are checked once, at load", function()
+    mustLoad()
+    -- Break the table after load. A second check would repair this; a single one leaves it.
+    _G.LootToastMoverDB.minimap = { stale = true }
+    SlashCmdList.LOOTTOASTPOS("minimap")
+    SlashCmdList.LOOTTOASTPOS("minimap")
+    check(LootToastMoverDB.minimap ~= nil, "later reads do not re-run the load-time clean-up")
+end)
+
+------------------------------------------------------------------------------------------
+-- Every function the game calls into is wrapped: an error is handed to the error handler,
+-- mentioned in chat once, and counted, and after three the addon stops reacting to the alert
+-- layout rather than raising on every toast.
+test("An error inside the addon is contained, reported once and counted", function()
+    local anchor = mustLoad()
+    local realClear = AlertFrame.ClearAllPoints
+    AlertFrame.ClearAllPoints = function() error("alert frame exploded") end
+
+    check(pcall(AlertFrame.UpdateAnchors, AlertFrame), "the layout hook does not raise into Blizzard's code")
+    check(#ERRORS == 1 and ERRORS[1]:find("alert frame exploded", 1, true) ~= nil,
+          "the error reaches the error handler")
+    check(#CHAT == 1 and CHAT[1]:find("alert frame exploded", 1, true) ~= nil, "chat hears about it once")
+
+    AlertFrame:UpdateAnchors()
+    check(#CHAT == 1, "a second error is counted but not announced again")
+    AlertFrame:UpdateAnchors()
+    check(#ERRORS == 3 and #CHAT == 2 and CHAT[2]:find("/reload", 1, true) ~= nil,
+          "the third stands the addon down and says how to restart it")
+
+    AlertFrame.ClearAllPoints = realClear
+    local calls = #ERRORS
+    AlertFrame:UpdateAnchors()
+    check(#ERRORS == calls, "stood down, the hook no longer runs")
+
+    -- What the player asks for still answers.
+    _G.CHAT = {}
+    check(pcall(SlashCmdList.LOOTTOASTPOS, "help"), "slash commands still answer")
+    check(#CHAT > 0, "and still print")
+    SlashCmdList.LOOTTOASTPOS("")
+    check(anchor:IsShown(), "the box can still be shown")
+end)
+
+test("Slash commands, the compartment and the minimap button do not raise", function()
+    mustLoad()
+    local realShow = GameTooltip.Show
+    GameTooltip.Show = function() error("tooltip exploded") end
+    check(pcall(LootToastMover_OnCompartmentEnter, "LootToastMover", {}),
+          "the compartment tooltip is contained")
+    check(pcall(LootToastMoverMinimapButton:GetScript("OnEnter"), LootToastMoverMinimapButton),
+          "the minimap tooltip is contained")
+    GameTooltip.Show = realShow
+    check(#ERRORS == 2, "both were counted")
+
+    local realAdd = LootAlertSystem.AddAlert
+    LootAlertSystem.AddAlert = function() error("alert exploded") end
+    check(pcall(SlashCmdList.LOOTTOASTPOS, "test"), "the slash command returns")
+    LootAlertSystem.AddAlert = realAdd
+end)
+
+------------------------------------------------------------------------------------------
+-- Blizzard stacks alerts upward. With the box near the top of the screen a burst of toasts
+-- ran off the top, so the direction can be turned over. Nothing of Blizzard's is replaced:
+-- each link its layout pass builds is mirrored afterwards.
+local function linkOf(frame)
+    local point, relativeTo, relativePoint, x, y = frame:GetPoint()
+    return ("%s>%s:%s %d,%d"):format(point, relativeTo._name, relativePoint, x, y)
+end
+
+test("Toasts stack upward unless asked, and the alert frames are left alone", function()
+    mustLoad()
+    local queue = AddAlertQueue()
+    local first, second = queue:Add("first"), queue:Add("second")
+    check(linkOf(first) == "BOTTOM>AlertFrame:TOP 0,10", "the first toast sits on AlertFrame")
+    check(linkOf(second) == "BOTTOM>first:TOP 0,10", "the second sits above the first")
+    check(first:GetNumPoints() == 1 and second:GetNumPoints() == 1, "each still has only Blizzard's point")
+    check(LootToastMoverDB.growDown == false, "stacking downward is off by default")
+end)
+
+test("Stacking downward mirrors every link but the first", function()
+    mustLoad({ savedVars = { growDown = true, schema = 2 } })
+    local queue = AddAlertQueue()
+    local first, second, third = queue:Add("first"), queue:Add("second"), queue:Add("third")
+
+    check(linkOf(first) == "BOTTOM>AlertFrame:TOP 0,10", "the first toast still lands on the box")
+    check(linkOf(second) == "TOP>first:BOTTOM 0,-10", "the second hangs below the first")
+    check(linkOf(third) == "TOP>second:BOTTOM 0,-10", "the third below the second")
+    check(second:GetNumPoints() == 1 and third:GetNumPoints() == 1,
+          "no frame is left holding both Blizzard's point and the mirrored one")
+
+    -- Blizzard re-lays out on every alert, adding its point to whatever the frame has.
+    AlertFrame:UpdateAnchors()
+    AlertFrame:UpdateAnchors()
+    check(linkOf(third) == "TOP>second:BOTTOM 0,-10" and third:GetNumPoints() == 1,
+          "repeated layout passes leave one clean point")
+
+    -- The oldest toast finishes: the next one becomes the first and goes back on the box.
+    queue:Release(first)
+    check(linkOf(second) == "BOTTOM>AlertFrame:TOP 0,10" and second:GetNumPoints() == 1,
+          "a toast promoted to first sits on the box again")
+    check(linkOf(third) == "TOP>second:BOTTOM 0,-10", "and the rest still hang below it")
+end)
+
+test("Turning stacking downward off puts every toast back at once", function()
+    mustLoad()
+    local queue = AddAlertQueue()
+    local first, second = queue:Add("first"), queue:Add("second")
+    local stackCheck = stub.children(LootToastMoverOptionsPanel, "CheckButton")[2]
+
+    stackCheck:SetChecked(true)
+    stackCheck:GetScript("OnClick")(stackCheck)
+    check(LootToastMoverDB.growDown == true, "the checkbox saves the choice")
+    check(linkOf(second) == "TOP>first:BOTTOM 0,-10",
+          "toasts on screen turn over without waiting for the next one")
+
+    stackCheck:SetChecked(false)
+    stackCheck:GetScript("OnClick")(stackCheck)
+    check(linkOf(second) == "BOTTOM>first:TOP 0,10" and second:GetNumPoints() == 1,
+          "and turn back the same way")
+    check(linkOf(first) == "BOTTOM>AlertFrame:TOP 0,10", "the first never moved")
+
+    stackCheck:SetChecked(true)
+    stackCheck:GetScript("OnClick")(stackCheck)
+    LootToastMoverOptionsPanel.OnDefault()
+    check(LootToastMoverDB.growDown == false and linkOf(second) == "BOTTOM>first:TOP 0,10",
+          "Defaults turns it off again")
+    check(stackCheck:GetChecked() == false, "and the checkbox follows")
+end)
+
+test("Standing down hands downward toasts back to Blizzard's layout", function()
+    mustLoad({ savedVars = { growDown = true, schema = 2 } })
+    local queue = AddAlertQueue()
+    local first, second = queue:Add("first"), queue:Add("second")
+    check(linkOf(second) == "TOP>first:BOTTOM 0,-10", "hanging downward to begin with")
+
+    local realClear = AlertFrame.ClearAllPoints
+    AlertFrame.ClearAllPoints = function() error("alert frame exploded") end
+    for _ = 1, 3 do AlertFrame:UpdateAnchors() end
+    AlertFrame.ClearAllPoints = realClear
+
+    AlertFrame:UpdateAnchors()
+    check(linkOf(second) == "BOTTOM>first:TOP 0,10" and second:GetNumPoints() == 1,
+          "the toast is back on Blizzard's link, and only that")
+    check(first:GetNumPoints() == 1, "and so is the first")
+    check(LootToastMoverDB.growDown == true, "the saved choice is kept for after a /reload")
+end)
+
+test("Stacking downward moves only frames the alert system places itself", function()
+    mustLoad({ savedVars = { growDown = true, schema = 2 } })
+    local queue = AddAlertQueue()
+    local rolls = AddAlertAnchorFrame("external", "GroupLootContainer")
+    rolls:SetPoint("BOTTOM", UIParent, "TOP", 0, -400)
+    local selfPlaced = AddAlertAnchorFrame("auto", "SelfPlaced")
+    local later = AddAlertQueue()
+
+    local toast = queue:Add("toast")
+    local after = later:Add("after")
+    check(linkOf(rolls) == "BOTTOM>UIParent:TOP 0,-400",
+          "a frame the system only passes through is not touched, whatever its points look like")
+    check(linkOf(selfPlaced) == "TOP>GroupLootContainer:BOTTOM 0,0", "a frame that places itself is mirrored")
+    check(linkOf(after) == "TOP>SelfPlaced:BOTTOM 0,-10", "and so is the toast after it")
+    check(linkOf(toast) == "BOTTOM>AlertFrame:TOP 0,10", "the first toast stays on the box")
+end)
+
+------------------------------------------------------------------------------------------
+-- Retail and Forever already list the addon in the Addon Compartment, so a minimap button
+-- there is a second copy of the same entry. Only a first run takes the new default.
+test("The minimap button starts hidden only where there is an Addon Compartment", function()
+    mustLoad({ compartment = true })
+    check(not LootToastMoverMinimapButton:IsShown(),
+          "a first run with a compartment starts without the button")
+    SlashCmdList.LOOTTOASTPOS("minimap")
+    check(LootToastMoverMinimapButton:IsShown(), "/ltm minimap still brings it back")
+
+    mustLoad()
+    check(LootToastMoverMinimapButton:IsShown(),
+          "a first run without one shows it, as the Classic games need")
+
+    mustLoad({ compartment = true, savedVars = { schema = 2, minimapButton = { angle = 10 } } })
+    check(LootToastMoverMinimapButton:IsShown(), "an existing install keeps the button it had")
+
+    mustLoad({ compartment = true, savedVars = { schema = 2, minimapButton = { angle = 10, hide = false } } })
+    LootToastMoverOptionsPanel.OnDefault()
+    check(not LootToastMoverMinimapButton:IsShown(), "Defaults follows the game it is running in")
+end)
+
+------------------------------------------------------------------------------------------
+test("The box appears with Edit Mode and goes with it", function()
+    local anchor = mustLoad()
+    EventRegistry:TriggerEvent("EditMode.Enter")
+    check(anchor:IsShown(), "entering Edit Mode shows the box")
+    check(#CHAT == 0, "without the chat reminder, which is for the slash command")
+    EventRegistry:TriggerEvent("EditMode.Exit")
+    check(not anchor:IsShown(), "leaving hides it again")
+
+    SlashCmdList.LOOTTOASTPOS("")
+    EventRegistry:TriggerEvent("EditMode.Enter")
+    EventRegistry:TriggerEvent("EditMode.Exit")
+    check(anchor:IsShown(), "a box the player had already shown is left showing")
+
+    SlashCmdList.LOOTTOASTPOS("")
+    EventRegistry:TriggerEvent("EditMode.Enter")
+    SlashCmdList.LOOTTOASTPOS("")
+    SlashCmdList.LOOTTOASTPOS("")
+    EventRegistry:TriggerEvent("EditMode.Exit")
+    check(anchor:IsShown(), "and one re-shown by hand during Edit Mode is the player's again")
+
+    check(loadAddon({ before = function() _G.EventRegistry = nil end }) ~= nil,
+          "a client without the registry still loads")
+end)
+
+test("Escape hides the box, and showing it says how to hide it", function()
+    local anchor = mustLoad()
+    SlashCmdList.LOOTTOASTPOS("")
+    check(anchor:IsShown(), "shown")
+    check(#CHAT == 1 and CHAT[1]:find("/ltm", 1, true) ~= nil and CHAT[1]:find("Escape", 1, true) ~= nil,
+          "chat says how to hide it")
+    PressEscape()
+    check(not anchor:IsShown(), "Escape hides it")
+    _G.CHAT = {}
+    SlashCmdList.LOOTTOASTPOS("")
+    SlashCmdList.LOOTTOASTPOS("")
+    check(#CHAT == 1, "hiding it says nothing")
+
+    check(loadAddon({ before = function() _G.UISpecialFrames = nil end }) ~= nil,
+          "a client without the list still loads")
+end)
+
+test("The sample toast needs the item loader as well as the alert system", function()
+    mustLoad({ before = function() _G.Item = nil end })
+    check(pcall(SlashCmdList.LOOTTOASTPOS, "test"), "no error without it")
+    check(#CHAT == 1 and #ERRORS == 0, "just the chat line saying it is not available")
 end)
 
 ------------------------------------------------------------------------------------------

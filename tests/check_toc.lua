@@ -88,7 +88,9 @@ for _, key in ipairs({ "AddonCompartmentFunc", "AddonCompartmentFuncOnEnter",
     local fname = directives[key]
     if not fname or fname == "" then
         fail("missing ## " .. key)
-    elseif not source:find("function%s+" .. fname:gsub("%W", "%%%0") .. "%s*%(") then
+    -- Either spelling makes a global function: `function Name(` or `Name = Wrapper(function`.
+    elseif not source:find("function%s+" .. fname:gsub("%W", "%%%0") .. "%s*%(")
+        and not source:find("\n" .. fname:gsub("%W", "%%%0") .. "%s*=%s*%a+%(") then
         fail(("## %s names %s, but LootToastMover.lua defines no such global function")
             :format(key, fname))
     end

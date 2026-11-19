@@ -1,6 +1,6 @@
 
 ----------------------------------------------------------------------------------------------------
--- LootToastMover ▪ v4.15.1 --------------------------------------------------------------------------
+-- LootToastMover ▪ v4.16.0 --------------------------------------------------------------------------
 -- Re-anchors Blizzard's AlertFrame (loot toasts, achievements) to a draggable anchor box.
 ----------------------------------------------------------------------------------------------------
 local ADDON_NAME, ns = ...
@@ -36,6 +36,20 @@ local LEGACY_BOX_HEIGHT, LEGACY_TOAST_GAP = 60, 31
 
 local DEFAULT_MINIMAP_ANGLE = 198
 
+-- The anchor points the game accepts. A saved point that is not one of these makes SetPoint
+-- raise, at every login, before the rest of the addon has been set up.
+local VALID_POINTS = {
+    TOPLEFT = true, TOP = true, TOPRIGHT = true,
+    LEFT = true, CENTER = true, RIGHT = true,
+    BOTTOMLEFT = true, BOTTOM = true, BOTTOMRIGHT = true,
+}
+
+-- A number a frame can be placed with: not NaN and not infinite, both of which a damaged
+-- saved-variables file can hold.
+local function IsNumber(n)
+    return type(n) == "number" and n == n and n ~= math.huge and n ~= -math.huge
+end
+
 local function MigratePosition(db)
     if db.schema == SCHEMA_VERSION then return end
     if db.point then
@@ -52,22 +66,65 @@ local function MigratePosition(db)
     db.schema = SCHEMA_VERSION
 end
 
--- Only ever called from ADDON_LOADED onwards, which is the point at which SavedVariables are
--- guaranteed to be in place.
-local function GetDB()
+-- Retail and Forever list every addon in the Addon Compartment next to the minimap, so a
+-- minimap button there is a second copy of the same entry. A new install starts with the
+-- button hidden in those games and shown in the Classic ones, which have no compartment.
+local function MinimapHiddenByDefault()
+    return AddonCompartmentFrame ~= nil
+end
+
+-- The saved variables, once they have been checked. Everything below reads this through
+-- GetDB() and never touches the LootToastMoverDB global again.
+local db
+
+-- Check and repair the saved variables, once. Anything unusable -- from a hand-edit, a
+-- crash mid-write, or a much older version -- is put back to its default here, so no code
+-- further down has to wonder what it was handed.
+local function InitDB()
+    local firstRun = type(LootToastMoverDB) ~= "table" or next(LootToastMoverDB) == nil
     if type(LootToastMoverDB) ~= "table" then LootToastMoverDB = {} end
+    local saved = LootToastMoverDB
+
     -- Left over from the LibDBIcon minimap button that the Addon Compartment replaced. The
     -- button below is this addon's own and keeps its state under `minimapButton`, so the
     -- stale LibDBIcon table stays dead weight and is still dropped.
-    LootToastMoverDB.minimap = nil
-    if type(LootToastMoverDB.minimapButton) ~= "table" then
-        LootToastMoverDB.minimapButton = {}
+    saved.minimap = nil
+    if type(saved.minimapButton) ~= "table" then saved.minimapButton = {} end
+    if not IsNumber(saved.minimapButton.angle) then
+        saved.minimapButton.angle = DEFAULT_MINIMAP_ANGLE
     end
-    if type(LootToastMoverDB.minimapButton.angle) ~= "number" then
-        LootToastMoverDB.minimapButton.angle = DEFAULT_MINIMAP_ANGLE
+    -- Anyone who already has the addon keeps the button they are used to seeing; only a
+    -- first run takes the per-game default.
+    if type(saved.minimapButton.hide) ~= "boolean" then
+        saved.minimapButton.hide = firstRun and MinimapHiddenByDefault()
     end
-    MigratePosition(LootToastMoverDB)
-    return LootToastMoverDB
+
+    if saved.point ~= nil then
+        local point = type(saved.point) == "string" and saved.point:upper()
+        local relPoint = point
+        if saved.relPoint ~= nil then
+            relPoint = type(saved.relPoint) == "string" and saved.relPoint:upper()
+        end
+        local x, y = saved.xOfs or 0, saved.yOfs or 0
+        if VALID_POINTS[point] and VALID_POINTS[relPoint] and IsNumber(x) and IsNumber(y) then
+            saved.point, saved.relPoint, saved.xOfs, saved.yOfs = point, relPoint, x, y
+        else
+            -- Not a position the game can use, so the box goes back to its default.
+            saved.point, saved.relPoint, saved.xOfs, saved.yOfs = nil, nil, nil, nil
+        end
+    end
+
+    saved.growDown = saved.growDown == true
+
+    MigratePosition(saved)
+    db = saved
+end
+
+-- Only ever called from ADDON_LOADED onwards, which is the point at which SavedVariables are
+-- guaranteed to be in place.
+local function GetDB()
+    if not db then InitDB() end
+    return db
 end
 
 ------------------------------------------------ Anchor box ----------------------------------------
@@ -93,7 +150,7 @@ anchor:SetBackdropBorderColor(1, 0.82, 0, 1)
 
 local title = anchor:CreateFontString(nil, "OVERLAY", "GameFontNormal")
 title:SetPoint("TOP", 0, -10)
-title:SetText("|cffffd100LootToastMover|r")
+title:SetText("|cffffd100" .. DISPLAY_NAME .. "|r")
 
 local body = anchor:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
 body:SetPoint("CENTER", 0, -2)
@@ -108,6 +165,59 @@ hint:SetText("/ltm test")
 
 anchor:Hide()
 
+-- Escape hides the box, the way it closes any other window. The game hides every frame named
+-- in this list when Escape is pressed.
+if type(UISpecialFrames) == "table" then
+    table.insert(UISpecialFrames, "LootToastMoverAnchor")
+end
+
+------------------------------------------------ Errors ---------------------------------------------
+-- Every function the game calls into is wrapped. An error inside the addon goes to the
+-- game's error handler (so BugSack and the like record it with a stack), is mentioned in
+-- chat once, and is counted. After a few in one session the addon stops reacting to
+-- Blizzard's alert layout until a /reload, because the same fault would otherwise fire on
+-- every toast. Saved settings are never touched by any of this.
+local ERROR_LIMIT = 3
+local errorCount, stoodDown = 0, false
+
+local Restack -- defined with the stacking code below
+
+local function Fail(err)
+    errorCount = errorCount + 1
+    local handler = geterrorhandler and geterrorhandler()
+    if handler then pcall(handler, err) end
+    if errorCount == 1 then
+        Say(L.ERROR_ONCE:format(tostring(err)))
+    end
+    if errorCount >= ERROR_LIMIT and not stoodDown then
+        stoodDown = true
+        -- Any toast hanging downward goes back to Blizzard's own link now: the hook that
+        -- keeps it mirrored is about to stop running, and Blizzard's next pass would leave
+        -- the frame holding its point and ours together.
+        pcall(Restack)
+        Say(L.STOOD_DOWN:format(tostring(errorCount)))
+    end
+end
+
+--- Wrap something the game calls on its own schedule: a hook or a frame script. Does nothing
+--- once the addon has stood down.
+local function Guarded(fn)
+    return function(...)
+        if stoodDown then return end
+        local ok, err = pcall(fn, ...)
+        if not ok then Fail(err) end
+    end
+end
+
+--- Wrap something the player asked for: a slash command, a click, a menu entry. Still
+--- answers after a stand-down, since the commands are how a player finds out what happened.
+local function Protected(fn)
+    return function(...)
+        local ok, err = pcall(fn, ...)
+        if not ok then Fail(err) end
+    end
+end
+
 ------------------------------------------------ Helper to snap AlertFrame --------------------------
 -- Alerts anchor their BOTTOM to AlertFrame's BOTTOM and stack upward from there (see
 -- AlertContainerMixin:UpdateAnchors and GetPointsForJustification, which retail and the
@@ -117,15 +227,109 @@ local function SnapAlert()
     AlertFrame:ClearAllPoints()
     AlertFrame:SetPoint("BOTTOM", anchor, "BOTTOM", 0, 0)
 end
+
+-- Blizzard's managed-frame containers skip any frame carrying this flag. Nothing in the
+-- current UI source hands AlertFrame to one, in retail or in Classic Era, so today this is
+-- a precaution rather than something the addon depends on.
 AlertFrame.ignoreFramePositionManager = true
-hooksecurefunc(AlertFrame, "UpdateAnchors", SnapAlert)
+
+------------------------------------------------ Stacking downward ----------------------------------
+-- Blizzard stacks alerts upward: each one's BOTTOM is anchored to the TOP of the one before
+-- it, 10 apart (AlertFrameQueueMixin:AdjustAnchors, and GetPointsForJustification for the
+-- frames that place themselves). With the box near the top of the screen that runs a burst
+-- of toasts off the top, so the direction can be turned over.
+--
+-- Nothing of Blizzard's is replaced. After its own layout pass has run, each link in the
+-- chain it just built is mirrored: TOP anchored to the BOTTOM of the one before, the same
+-- distance apart. The first alert is left alone, so it still lands on the box. With the
+-- option off and nothing mirrored, none of this touches a frame.
+local MIRROR = {
+    BOTTOM = "TOP", BOTTOMLEFT = "TOPLEFT", BOTTOMRIGHT = "TOPRIGHT",
+    TOP = "BOTTOM", TOPLEFT = "BOTTOMLEFT", TOPRIGHT = "BOTTOMRIGHT",
+}
+
+-- Frames currently mirrored, each with the link Blizzard gave it, so that turning the option
+-- off puts them back without waiting for the next toast. Weak, because alert frames are
+-- pooled and this must not be what keeps one alive.
+local mirrored = setmetatable({}, { __mode = "k" })
+
+--- The upward link Blizzard's layout pass set on a frame, if it has one.
+local function UpwardLink(frame)
+    for i = 1, frame:GetNumPoints() do
+        local point, relativeTo, relativePoint, x, y = frame:GetPoint(i)
+        if type(point) == "string" and type(relativePoint) == "string"
+            and point:find("^BOTTOM") and relativePoint:find("^TOP") then
+            return point, relativeTo, relativePoint, x or 0, y or 0
+        end
+    end
+end
+
+local function RestackFrame(frame, down)
+    local point, relativeTo, relativePoint, x, y = UpwardLink(frame)
+    if point then
+        -- Blizzard's queue adds its point without clearing the frame's others, so a frame
+        -- mirrored on the last pass now carries both. Either way it is rebuilt from the
+        -- link Blizzard just set.
+        local carriesOurs = frame:GetNumPoints() > 1
+        if down and relativeTo ~= AlertFrame then
+            frame:ClearAllPoints()
+            frame:SetPoint(MIRROR[point], relativeTo, MIRROR[relativePoint], x, -y)
+            mirrored[frame] = { point, relativeTo, relativePoint, x, y }
+        else
+            if carriesOurs then
+                frame:ClearAllPoints()
+                frame:SetPoint(point, relativeTo, relativePoint, x, y)
+            end
+            mirrored[frame] = nil
+        end
+    elseif mirrored[frame] and not down then
+        -- Switched off between two of Blizzard's passes: put its link back ourselves.
+        local link = mirrored[frame]
+        frame:ClearAllPoints()
+        frame:SetPoint(link[1], link[2], link[3], link[4], link[5])
+        mirrored[frame] = nil
+    end
+end
+
+Restack = function()
+    local down = GetDB().growDown and not stoodDown
+    if not down and next(mirrored) == nil then return end
+    local systems = AlertFrame.alertFrameSubSystems
+    if type(systems) ~= "table" then return end
+    -- Only frames the alert system positions itself. A frame it merely passes through
+    -- (the loot-roll container, the talking head) is positioned by something else and is
+    -- left exactly where that put it.
+    local autoAnchor = AlertFrameAutoAnchoredMixin and AlertFrameAutoAnchoredMixin.AdjustAnchors
+    for _, system in ipairs(systems) do
+        local pool = system.alertFramePool
+        if pool and pool.EnumerateActive then
+            for frame in pool:EnumerateActive() do
+                RestackFrame(frame, down)
+            end
+        elseif autoAnchor and system.AdjustAnchors == autoAnchor
+            and system.anchorFrame and system.anchorFrame:IsShown() then
+            RestackFrame(system.anchorFrame, down)
+        end
+    end
+end
+
+hooksecurefunc(AlertFrame, "UpdateAnchors", Guarded(function()
+    SnapAlert()
+    Restack()
+end))
+
+local function SetGrowDown(down)
+    GetDB().growDown = down and true or false
+    Restack()
+end
 
 ------------------------------------------------ Position helpers ----------------------------------
 local function ApplySavedPosition()
-    local db = GetDB()
+    local saved = GetDB()
     anchor:ClearAllPoints()
-    if db.point then
-        anchor:SetPoint(db.point, UIParent, db.relPoint or db.point, db.xOfs or 0, db.yOfs or 0)
+    if saved.point then
+        -- Checked at load, so these are a real anchor point and real numbers.
+        anchor:SetPoint(saved.point, UIParent, saved.relPoint, saved.xOfs, saved.yOfs)
     else
         anchor:SetPoint(DEFAULT_POINT, UIParent, DEFAULT_REL_POINT, DEFAULT_X, DEFAULT_Y)
     end
@@ -133,22 +337,48 @@ local function ApplySavedPosition()
 end
 
 local function ResetPosition()
-    local db = GetDB()
-    db.point, db.relPoint, db.xOfs, db.yOfs = nil, nil, nil, nil
+    local saved = GetDB()
+    saved.point, saved.relPoint, saved.xOfs, saved.yOfs = nil, nil, nil, nil
     anchor:ClearAllPoints()
     anchor:SetPoint(DEFAULT_POINT, UIParent, DEFAULT_REL_POINT, DEFAULT_X, DEFAULT_Y)
     SnapAlert()
 end
 
+-- Whether the box is on screen only because Edit Mode put it there.
+local shownByEditMode = false
+
 local function ToggleAnchor()
-    anchor:SetShown(not anchor:IsShown())
+    local show = not anchor:IsShown()
+    shownByEditMode = false
+    anchor:SetShown(show)
+    if show then
+        -- The box stays until it is dismissed, and it is easy to forget how.
+        Say(L.ANCHOR_SHOWN)
+    end
+end
+
+-- Edit Mode is where the rest of the UI is arranged, so the box is there too: it appears
+-- when Edit Mode opens and goes when it closes, unless it was already showing. The events
+-- are the ones Blizzard's own frames listen to (EditModeManagerFrame fires them through
+-- EventRegistry), so nothing of Edit Mode's is touched. Clients without it never fire them.
+if EventRegistry and EventRegistry.RegisterCallback then
+    EventRegistry:RegisterCallback("EditMode.Enter", Guarded(function()
+        if not anchor:IsShown() then
+            anchor:Show()
+            shownByEditMode = true
+        end
+    end), anchor)
+    EventRegistry:RegisterCallback("EditMode.Exit", Guarded(function()
+        if shownByEditMode then anchor:Hide() end
+        shownByEditMode = false
+    end), anchor)
 end
 
 ------------------------------------------------ Sample toast ---------------------------------------
 -- Fires a genuine loot toast through Blizzard's own alert system, so what you see is exactly
 -- what a real drop looks like in the position you have chosen.
 local function ShowSampleToast()
-    if not LootAlertSystem then
+    if not (LootAlertSystem and Item and Item.CreateFromItemID) then
         Say(L.NO_ALERT_SYSTEM)
         return
     end
@@ -162,14 +392,16 @@ local function ShowSampleToast()
 end
 
 ------------------------------------------------ Drag handling -------------------------------------
-anchor:SetScript("OnDragStart", anchor.StartMoving)
-anchor:SetScript("OnDragStop", function(self)
+anchor:SetScript("OnDragStart", Guarded(function(self)
+    self:StartMoving()
+end))
+anchor:SetScript("OnDragStop", Guarded(function(self)
     self:StopMovingOrSizing()
     local point, _, relPoint, xOfs, yOfs = self:GetPoint()
-    local db = GetDB()
-    db.point, db.relPoint, db.xOfs, db.yOfs = point, relPoint, xOfs, yOfs
+    local saved = GetDB()
+    saved.point, saved.relPoint, saved.xOfs, saved.yOfs = point, relPoint, xOfs, yOfs
     SnapAlert()
-end)
+end))
 
 ------------------------------------------------ Shared tooltip text --------------------------------
 -- The compartment entry, the minimap button and the broker plugin all describe the same
@@ -199,7 +431,7 @@ local function PanelButton(parent, label, onClick)
     local button = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
     button:SetSize(BUTTON_WIDTH, BUTTON_HEIGHT)
     button:SetText(label)
-    button:SetScript("OnClick", onClick)
+    button:SetScript("OnClick", Protected(onClick))
     return button
 end
 
@@ -250,14 +482,25 @@ local function BuildOptionsPanel()
     -- Assigned at the end of the file, once the minimap button exists.
     panel.setMinimapShown = nil
 
-    check:SetScript("OnClick", function(self)
-        local db = GetDB()
-        db.minimapButton.hide = not self:GetChecked()
-        if panel.setMinimapShown then panel.setMinimapShown(not db.minimapButton.hide) end
-    end)
+    check:SetScript("OnClick", Protected(function(self)
+        local saved = GetDB()
+        saved.minimapButton.hide = not self:GetChecked()
+        if panel.setMinimapShown then panel.setMinimapShown(not saved.minimapButton.hide) end
+    end))
+
+    local stackCheck = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
+    stackCheck:SetPoint("TOPLEFT", check, "BOTTOMLEFT", 0, -4)
+
+    local stackLabel = panel:CreateFontString(nil, "ARTWORK", "GameFontHighlight")
+    stackLabel:SetPoint("LEFT", stackCheck, "RIGHT", 2, 0)
+    stackLabel:SetText(L.CHECK_STACK_DOWN)
+
+    stackCheck:SetScript("OnClick", Protected(function(self)
+        SetGrowDown(self:GetChecked())
+    end))
 
     local commands = panel:CreateFontString(nil, "ARTWORK", "GameFontDisableSmall")
-    commands:SetPoint("TOPLEFT", check, "BOTTOMLEFT", 0, -16)
+    commands:SetPoint("TOPLEFT", stackCheck, "BOTTOMLEFT", 0, -16)
     commands:SetJustifyH("LEFT")
     commands:SetText(table.concat({
         L.EITHER_COMMAND:format("/ltm", "/loottoastpos") .. " – " .. L.COMMAND_TOGGLE,
@@ -267,21 +510,24 @@ local function BuildOptionsPanel()
     }, "\n"))
 
     refreshOptions = function()
-        check:SetChecked(not GetDB().minimapButton.hide)
+        local saved = GetDB()
+        check:SetChecked(not saved.minimapButton.hide)
+        stackCheck:SetChecked(saved.growDown)
     end
 
     -- Blizzard's canvas layout calls these when the panel is shown, when Okay is pressed and
     -- when Defaults is pressed. Nothing is staged, so committing is a no-op.
-    panel.OnRefresh = refreshOptions
+    panel.OnRefresh = Protected(refreshOptions)
     panel.OnCommit = function() end
-    panel.OnDefault = function()
+    panel.OnDefault = Protected(function()
         ResetPosition()
-        local db = GetDB()
-        db.minimapButton.hide = false
-        db.minimapButton.angle = DEFAULT_MINIMAP_ANGLE
-        if panel.setMinimapShown then panel.setMinimapShown(true) end
+        SetGrowDown(false)
+        local saved = GetDB()
+        saved.minimapButton.hide = MinimapHiddenByDefault()
+        saved.minimapButton.angle = DEFAULT_MINIMAP_ANGLE
+        if panel.setMinimapShown then panel.setMinimapShown(not saved.minimapButton.hide) end
         refreshOptions()
-    end
+    end)
 
     -- Settings.RegisterAddOnCategory has been the way in since 10.0, and every game the TOC
     -- lists has it, the Classic ones included; the guard is only so a stripped client cannot
@@ -372,25 +618,29 @@ local function DragMinimapButton()
 end
 
 minimapButton:SetScript("OnDragStart", function(self)
-    self:SetScript("OnUpdate", DragMinimapButton)
+    self:SetScript("OnUpdate", Guarded(DragMinimapButton))
 end)
 minimapButton:SetScript("OnDragStop", function(self)
     self:SetScript("OnUpdate", nil)
 end)
 
-minimapButton:SetScript("OnClick", function(_, button)
+-- The minimap button, the broker plugin and the compartment entry all answer a click the
+-- same way.
+local function OnLauncherClick(_, button)
     if button == "RightButton" then
         OpenOptions()
     else
         ToggleAnchor()
     end
-end)
+end
 
-minimapButton:SetScript("OnEnter", function(self)
+minimapButton:SetScript("OnClick", Protected(OnLauncherClick))
+
+minimapButton:SetScript("OnEnter", Protected(function(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     FillTooltip(GameTooltip)
     GameTooltip:Show()
-end)
+end))
 minimapButton:SetScript("OnLeave", function() GameTooltip:Hide() end)
 
 minimapButton:Hide()
@@ -401,17 +651,17 @@ end
 optionsPanel.setMinimapShown = SetMinimapButtonShown
 
 local function ApplyMinimapButtonState()
-    local db = GetDB()
-    PlaceMinimapButton(db.minimapButton.angle)
-    SetMinimapButtonShown(not db.minimapButton.hide)
+    local saved = GetDB()
+    PlaceMinimapButton(saved.minimapButton.angle)
+    SetMinimapButtonShown(not saved.minimapButton.hide)
 end
 
 local function ToggleMinimapButton()
-    local db = GetDB()
-    db.minimapButton.hide = not db.minimapButton.hide
-    SetMinimapButtonShown(not db.minimapButton.hide)
+    local saved = GetDB()
+    saved.minimapButton.hide = not saved.minimapButton.hide
+    SetMinimapButtonShown(not saved.minimapButton.hide)
     if refreshOptions then refreshOptions() end
-    return not db.minimapButton.hide
+    return not saved.minimapButton.hide
 end
 
 ------------------------------------------------ Broker plugin --------------------------------------
@@ -431,17 +681,11 @@ local function RegisterBroker()
         type = "launcher",
         icon = ICON,
         label = DISPLAY_NAME,
-        OnClick = function(_, button)
-            if button == "RightButton" then
-                OpenOptions()
-            else
-                ToggleAnchor()
-            end
-        end,
-        OnTooltipShow = function(tooltip)
+        OnClick = Protected(OnLauncherClick),
+        OnTooltipShow = Protected(function(tooltip)
             if not tooltip or not tooltip.AddLine then return end
             FillTooltip(tooltip)
-        end,
+        end),
     })
     brokerRegistered = true
     return true
@@ -453,28 +697,22 @@ end
 -- Blizzard_Minimap/Mainline/AddonCompartment.lua. Only retail and Forever have a compartment.
 -- The Classic games ignore these TOC fields, and the minimap button covers the same ground.
 
-function LootToastMover_OnCompartmentClick(_, buttonName)
-    if buttonName == "RightButton" then
-        OpenOptions()
-    else
-        ToggleAnchor()
-    end
-end
+LootToastMover_OnCompartmentClick = Protected(OnLauncherClick)
 
-function LootToastMover_OnCompartmentEnter(_, button)
+LootToastMover_OnCompartmentEnter = Protected(function(_, button)
     GameTooltip:SetOwner(button, "ANCHOR_LEFT")
     FillTooltip(GameTooltip)
     GameTooltip:Show()
-end
+end)
 
-function LootToastMover_OnCompartmentLeave()
+LootToastMover_OnCompartmentLeave = Protected(function()
     GameTooltip:Hide()
-end
+end)
 
 ------------------------------------------------ Slash cmd -----------------------------------------
 SLASH_LOOTTOASTPOS1 = "/loottoastpos"
 SLASH_LOOTTOASTPOS2 = "/ltm"
-SlashCmdList.LOOTTOASTPOS = function(msg)
+SlashCmdList.LOOTTOASTPOS = Protected(function(msg)
     local cmd = strtrim(msg or ""):lower()
     if cmd == "reset" then
         ResetPosition()
@@ -501,23 +739,26 @@ SlashCmdList.LOOTTOASTPOS = function(msg)
             print(("  |cffffd100%s|r – %s"):format(usage[1], usage[2]))
         end
     end
-end
+end)
 
 ------------------------------------------------ Init ----------------------------------------------
 local loader = CreateFrame("Frame")
 loader:RegisterEvent("ADDON_LOADED")
 loader:RegisterEvent("PLAYER_LOGIN")
-loader:SetScript("OnEvent", function(self, event, addonName)
+loader:SetScript("OnEvent", Protected(function(self, event, addonName)
     if event == "ADDON_LOADED" then
         if addonName ~= ADDON_NAME then return end
+        -- Unregistered first, so that a fault in any one step below cannot leave the
+        -- handler running again for every addon that loads after this one.
+        self:UnregisterEvent(event)
+        InitDB()
         ApplySavedPosition()
         ApplyMinimapButtonState()
         if refreshOptions then refreshOptions() end
-        self:UnregisterEvent(event)
     elseif event == "PLAYER_LOGIN" then
         -- Every addon has loaded by now, so a broker display's copy of LibDataBroker is in
         -- place if there is one. One attempt, no retry ticker.
         RegisterBroker()
         self:UnregisterEvent(event)
     end
-end)
+end))

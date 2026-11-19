@@ -13,7 +13,9 @@ Your position is saved account-wide and restored every login.
 
 1. Type `/ltm`, or click the bag icon on your minimap
 2. Drag the box where you want alerts to appear
-3. Click or type `/ltm` again to hide it
+3. Click, press Escape or type `/ltm` again to hide it
+
+The box also shows up on its own while Edit Mode is open.
 
 That's it. Nothing to configure.
 
@@ -34,10 +36,12 @@ That's it. Nothing to configure.
 However your UI is set up, the addon is somewhere you'll find it:
 
 - **Minimap button** — the bag icon on the minimap ring. Left-click toggles the anchor box,
-  right-click opens the options panel, and you can drag it anywhere around the ring.
+  right-click opens the options panel, and you can drag it anywhere around the ring. In
+  retail and Forever a new install starts with it hidden, since the Addon Compartment
+  already lists the addon; `/ltm minimap` shows it.
 - **Options panel** — Game Menu → Options → AddOns → **LootToastMover**. Buttons for showing
-  the anchor, firing a sample toast and resetting the position, plus a checkbox to hide the
-  minimap button.
+  the anchor, firing a sample toast and resetting the position, plus checkboxes for the
+  minimap button and for stacking toasts downward.
 - **Broker plugin** — if you run Titan Panel, Bazooka, ChocolateBar, ElvUI datatexts or any
   other broker display, LootToastMover appears in its plugin list as a launcher.
 - **Addon Compartment** — the addon-list button next to the minimap, in retail and Forever.
@@ -57,7 +61,9 @@ uses it, not just loot:
 - Guild renames
 - Specialization unlocks
 
-Alerts stack upward from the anchor, the same way they always have. Forever uses the same
+Alerts stack upward from the anchor, the same way they always have. If your anchor is near
+the top of the screen, tick **Stack new toasts downward** in the options panel and they
+hang below it instead. Forever uses the same
 alert frame, so whichever of these alerts Forever shows land on the anchor too.
 
 The Classic games send far fewer alerts through this frame. Loot never goes through it

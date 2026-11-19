@@ -36,6 +36,7 @@ local enUS = {
     BUTTON_TEST = "Show a sample toast",
     BUTTON_RESET = "Reset position",
     CHECK_MINIMAP = "Show the minimap button",
+    CHECK_STACK_DOWN = "Stack new toasts downward",
 
     -- What each slash command does, listed in the options panel and in /ltm's usage message.
     EITHER_COMMAND = "%s or %s",
@@ -55,6 +56,11 @@ local enUS = {
     NO_OPTIONS = "the options panel is not available on this client. %s",
     OPTIONS_FAILED = "could not open the options panel. %s",
     USE_COMMANDS = "Use /ltm, /ltm test and /ltm reset instead.",
+    ANCHOR_SHOWN = "anchor box shown. Drag it, then press Escape or type /ltm to hide it.",
+
+    -- Shown if the addon itself goes wrong. %s is the error text, then the number of errors.
+    ERROR_ONCE = "hit an error and is carrying on: %s",
+    STOOD_DOWN = "stopped after %s errors. Type /reload to start it again.",
 }
 
 local translations = {
@@ -70,6 +76,7 @@ local translations = {
         BUTTON_TEST = "Beispielmeldung anzeigen",
         BUTTON_RESET = "Position zurücksetzen",
         CHECK_MINIMAP = "Minikartensymbol anzeigen",
+        CHECK_STACK_DOWN = "Neue Meldungen nach unten stapeln",
         EITHER_COMMAND = "%s oder %s",
         COMMAND_TOGGLE = "Ankerrahmen ein- oder ausblenden",
         COMMAND_TEST = "Beispiel-Beutemeldung anzeigen",
@@ -85,6 +92,9 @@ local translations = {
         NO_OPTIONS = "Das Optionsfenster ist in diesem Client nicht verfügbar. %s",
         OPTIONS_FAILED = "Das Optionsfenster konnte nicht geöffnet werden. %s",
         USE_COMMANDS = "Stattdessen /ltm, /ltm test und /ltm reset verwenden.",
+        ANCHOR_SHOWN = "Ankerrahmen eingeblendet. Verschieben, dann Escape drücken oder /ltm eingeben, um ihn auszublenden.",
+        ERROR_ONCE = "hat einen Fehler festgestellt und läuft weiter: %s",
+        STOOD_DOWN = "nach %s Fehlern angehalten. /reload eingeben, um es wieder zu starten.",
     },
 
     esES = {
@@ -99,6 +109,7 @@ local translations = {
         BUTTON_TEST = "Mostrar una alerta de ejemplo",
         BUTTON_RESET = "Restablecer posición",
         CHECK_MINIMAP = "Mostrar el botón del minimapa",
+        CHECK_STACK_DOWN = "Apilar las alertas nuevas hacia abajo",
         EITHER_COMMAND = "%s o %s",
         COMMAND_TOGGLE = "mostrar u ocultar el marco de anclaje",
         COMMAND_TEST = "mostrar una alerta de botín de ejemplo",
@@ -114,6 +125,9 @@ local translations = {
         NO_OPTIONS = "el panel de opciones no está disponible en este cliente. %s",
         OPTIONS_FAILED = "no se pudo abrir el panel de opciones. %s",
         USE_COMMANDS = "Usa /ltm, /ltm test y /ltm reset en su lugar.",
+        ANCHOR_SHOWN = "marco de anclaje visible. Arrástralo y luego pulsa Escape o escribe /ltm para ocultarlo.",
+        ERROR_ONCE = "ha encontrado un error y sigue funcionando: %s",
+        STOOD_DOWN = "detenido tras %s errores. Escribe /reload para volver a iniciarlo.",
     },
 
     frFR = {
@@ -128,6 +142,7 @@ local translations = {
         BUTTON_TEST = "Afficher une alerte d'exemple",
         BUTTON_RESET = "Réinitialiser la position",
         CHECK_MINIMAP = "Afficher le bouton de la minicarte",
+        CHECK_STACK_DOWN = "Empiler les nouvelles alertes vers le bas",
         EITHER_COMMAND = "%s ou %s",
         COMMAND_TOGGLE = "afficher ou masquer le cadre d'ancrage",
         COMMAND_TEST = "afficher une alerte de butin d'exemple",
@@ -143,6 +158,9 @@ local translations = {
         NO_OPTIONS = "le panneau d'options n'est pas disponible sur ce client. %s",
         OPTIONS_FAILED = "impossible d'ouvrir le panneau d'options. %s",
         USE_COMMANDS = "Utilisez plutôt /ltm, /ltm test et /ltm reset.",
+        ANCHOR_SHOWN = "cadre d'ancrage affiché. Faites-le glisser, puis appuyez sur Échap ou tapez /ltm pour le masquer.",
+        ERROR_ONCE = "a rencontré une erreur et continue : %s",
+        STOOD_DOWN = "arrêté après %s erreurs. Tapez /reload pour le relancer.",
     },
 
     itIT = {
@@ -157,6 +175,7 @@ local translations = {
         BUTTON_TEST = "Mostra un avviso di esempio",
         BUTTON_RESET = "Ripristina posizione",
         CHECK_MINIMAP = "Mostra il pulsante della minimappa",
+        CHECK_STACK_DOWN = "Impila i nuovi avvisi verso il basso",
         EITHER_COMMAND = "%s o %s",
         COMMAND_TOGGLE = "mostra o nascondi il riquadro di ancoraggio",
         COMMAND_TEST = "mostra un avviso di bottino di esempio",
@@ -172,6 +191,9 @@ local translations = {
         NO_OPTIONS = "il pannello delle opzioni non è disponibile su questo client. %s",
         OPTIONS_FAILED = "impossibile aprire il pannello delle opzioni. %s",
         USE_COMMANDS = "Usa invece /ltm, /ltm test e /ltm reset.",
+        ANCHOR_SHOWN = "riquadro di ancoraggio visibile. Trascinalo, poi premi Esc o digita /ltm per nasconderlo.",
+        ERROR_ONCE = "ha riscontrato un errore e continua a funzionare: %s",
+        STOOD_DOWN = "arrestato dopo %s errori. Digita /reload per riavviarlo.",
     },
 
     koKR = {
@@ -186,6 +208,7 @@ local translations = {
         BUTTON_TEST = "예시 알림 표시",
         BUTTON_RESET = "위치 초기화",
         CHECK_MINIMAP = "미니맵 버튼 표시",
+        CHECK_STACK_DOWN = "새 알림을 아래쪽으로 쌓기",
         EITHER_COMMAND = "%s 또는 %s",
         COMMAND_TOGGLE = "앵커 상자 표시/숨기기",
         COMMAND_TEST = "예시 전리품 알림 표시",
@@ -201,6 +224,9 @@ local translations = {
         NO_OPTIONS = "이 클라이언트에서는 설정 창을 사용할 수 없습니다. %s",
         OPTIONS_FAILED = "설정 창을 열 수 없습니다. %s",
         USE_COMMANDS = "대신 /ltm, /ltm test, /ltm reset 명령어를 사용하세요.",
+        ANCHOR_SHOWN = "고정 상자를 표시했습니다. 끌어서 옮긴 뒤 Esc 키를 누르거나 /ltm 을 입력하면 숨겨집니다.",
+        ERROR_ONCE = "오류가 발생했지만 계속 동작합니다: %s",
+        STOOD_DOWN = "오류가 %s번 발생해 중지했습니다. 다시 시작하려면 /reload 를 입력하세요.",
     },
 
     ptBR = {
@@ -215,6 +241,7 @@ local translations = {
         BUTTON_TEST = "Mostrar um alerta de exemplo",
         BUTTON_RESET = "Redefinir posição",
         CHECK_MINIMAP = "Mostrar o botão do minimapa",
+        CHECK_STACK_DOWN = "Empilhar os novos alertas para baixo",
         EITHER_COMMAND = "%s ou %s",
         COMMAND_TOGGLE = "mostrar ou ocultar a caixa de ancoragem",
         COMMAND_TEST = "mostrar um alerta de saque de exemplo",
@@ -230,6 +257,9 @@ local translations = {
         NO_OPTIONS = "o painel de opções não está disponível neste cliente. %s",
         OPTIONS_FAILED = "não foi possível abrir o painel de opções. %s",
         USE_COMMANDS = "Em vez disso, use /ltm, /ltm test e /ltm reset.",
+        ANCHOR_SHOWN = "caixa de âncora exibida. Arraste-a e depois pressione Esc ou digite /ltm para ocultá-la.",
+        ERROR_ONCE = "encontrou um erro e continua funcionando: %s",
+        STOOD_DOWN = "parou após %s erros. Digite /reload para iniciá-lo de novo.",
     },
 
     ruRU = {
@@ -244,6 +274,7 @@ local translations = {
         BUTTON_TEST = "Показать пример уведомления",
         BUTTON_RESET = "Сбросить позицию",
         CHECK_MINIMAP = "Показывать кнопку у миникарты",
+        CHECK_STACK_DOWN = "Размещать новые уведомления вниз",
         EITHER_COMMAND = "%s или %s",
         COMMAND_TOGGLE = "показать или скрыть рамку привязки",
         COMMAND_TEST = "показать пример уведомления о добыче",
@@ -259,6 +290,9 @@ local translations = {
         NO_OPTIONS = "панель настроек недоступна в этом клиенте. %s",
         OPTIONS_FAILED = "не удалось открыть панель настроек. %s",
         USE_COMMANDS = "Используйте вместо этого /ltm, /ltm test и /ltm reset.",
+        ANCHOR_SHOWN = "якорь показан. Перетащите его, затем нажмите Escape или введите /ltm, чтобы скрыть.",
+        ERROR_ONCE = "произошла ошибка, работа продолжается: %s",
+        STOOD_DOWN = "остановлен после %s ошибок. Введите /reload, чтобы запустить снова.",
     },
 
     zhCN = {
@@ -273,6 +307,7 @@ local translations = {
         BUTTON_TEST = "显示示例提示",
         BUTTON_RESET = "重置位置",
         CHECK_MINIMAP = "显示小地图按钮",
+        CHECK_STACK_DOWN = "新提示向下堆叠",
         EITHER_COMMAND = "%s 或 %s",
         COMMAND_TOGGLE = "显示或隐藏锚点框",
         COMMAND_TEST = "显示一个示例战利品提示",
@@ -288,6 +323,9 @@ local translations = {
         NO_OPTIONS = "此客户端无法使用设置面板。%s",
         OPTIONS_FAILED = "无法打开设置面板。%s",
         USE_COMMANDS = "请改用 /ltm、/ltm test 和 /ltm reset。",
+        ANCHOR_SHOWN = "锚点框已显示。拖动它，然后按 Esc 键或输入 /ltm 将其隐藏。",
+        ERROR_ONCE = "遇到一个错误，仍在继续运行：%s",
+        STOOD_DOWN = "出现 %s 个错误后已停止。输入 /reload 可重新启动。",
     },
 
     zhTW = {
@@ -302,6 +340,7 @@ local translations = {
         BUTTON_TEST = "顯示範例提示",
         BUTTON_RESET = "重置位置",
         CHECK_MINIMAP = "顯示小地圖按鈕",
+        CHECK_STACK_DOWN = "新提示向下堆疊",
         EITHER_COMMAND = "%s 或 %s",
         COMMAND_TOGGLE = "顯示或隱藏錨點框",
         COMMAND_TEST = "顯示一個範例戰利品提示",
@@ -317,6 +356,9 @@ local translations = {
         NO_OPTIONS = "此用戶端無法使用設定面板。%s",
         OPTIONS_FAILED = "無法開啟設定面板。%s",
         USE_COMMANDS = "請改用 /ltm、/ltm test 和 /ltm reset。",
+        ANCHOR_SHOWN = "錨點框已顯示。拖曳它，然後按 Esc 鍵或輸入 /ltm 將其隱藏。",
+        ERROR_ONCE = "遇到一個錯誤，仍在繼續執行：%s",
+        STOOD_DOWN = "出現 %s 個錯誤後已停止。輸入 /reload 可重新啟動。",
     },
 }
 
