@@ -1,0 +1,56 @@
+name: Bug report
+description: Something LootToastMover does wrong, or does not do
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what you got instead.
+      placeholder: I dragged the anchor box to the left of my screen, typed /ltm test, and the toast...
+    validations:
+      required: true
+  - type: dropdown
+    id: game
+    attributes:
+      label: Game
+      options:
+        - Retail
+        - World of Warcraft Forever
+        - Mists of Pandaria Classic
+        - Titan Reforged Classic
+        - TBC Anniversary
+        - Classic Era
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: LootToastMover version
+      description: Shown next to the addon in the game's AddOns list.
+      placeholder: "4.16.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: stacking
+    attributes:
+      label: Is "Stack new toasts downward" ticked?
+      options:
+        - "No"
+        - "Yes"
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: error
+    attributes:
+      label: Error text, if there was one
+      description: >-
+        The addon prints the first error it hits in chat. BugSack, or the game with
+        /console scriptErrors 1, shows the full text.
+      render: text
+  - type: textarea
+    id: addons
+    attributes:
+      label: Other addons that move or restyle alerts
+      description: UI packs such as ElvUI, or anything else that touches toasts. Does it still happen with only LootToastMover enabled?

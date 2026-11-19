@@ -13,15 +13,18 @@ globals = {
     "LootToastMover_OnCompartmentClick",
     "LootToastMover_OnCompartmentEnter",
     "LootToastMover_OnCompartmentLeave",
-    -- Opting AlertFrame out of Blizzard's frame position manager is the whole point of
-    -- this addon, so writing this one field is expected. AlertFrame itself stays read-only.
+    -- The one field this addon writes on AlertFrame, a flag Blizzard's managed-frame
+    -- containers skip a frame for. AlertFrame itself stays read-only.
     "AlertFrame.ignoreFramePositionManager",
 }
 
 -- WoW API surface the addon reads but never defines.
 read_globals = {
+    "AddonCompartmentFrame",       -- only looked at to see whether this game has one
     "AlertFrame",
+    "AlertFrameAutoAnchoredMixin", -- to recognise the alert frames that place themselves
     "CreateFrame",
+    "EventRegistry",               -- Edit Mode's enter and exit events
     "GameTooltip",
     "GetCursorPosition",
     "GetLocale",       -- the client's text language, which picks the translation
@@ -31,6 +34,8 @@ read_globals = {
     "Minimap",
     "Settings",        -- the 10.0+ options system, for the AddOns panel
     "UIParent",
+    "UISpecialFrames", -- frames Escape hides; the anchor box's name is added to it
+    "geterrorhandler",
     "hooksecurefunc",
     "strtrim",
 }
@@ -49,10 +54,14 @@ files["tests/"] = {
     std = "lua51",
     -- Settings is writable here so a test can break OpenToCategory on purpose and prove the
     -- addon survives Blizzard changing it.
-    globals = { "_G", "Settings" },
+    -- The other three are writable for the same reason: a test breaks one method on purpose
+    -- to prove an error inside the addon is contained.
+    globals = { "_G", "Settings", "AlertFrame", "GameTooltip", "LootAlertSystem" },
     read_globals = {
-        "AlertFrame", "CHAT", "CreateFrame", "FireEvent", "FlushItemLoads", "GameTooltip",
-        "GetCursorPosition", "Item", "LibStub", "LootAlertSystem", "LootToastMoverDB",
+        "AddAlertAnchorFrame", "AddAlertQueue", "ERRORS", "EventRegistry", "PressEscape",
+        "LootToastMoverOptionsPanel",
+        "CHAT", "CreateFrame", "FireEvent", "FlushItemLoads",
+        "GetCursorPosition", "Item", "LibStub", "LootToastMoverDB",
         "LootToastMover_OnCompartmentClick", "LootToastMover_OnCompartmentEnter",
         "LootToastMover_OnCompartmentLeave", "InstallBrokerLibs", "LootToastMoverMinimapButton",
         "Minimap", "MoveCursorTo", "PENDING_ITEM_LOADS", "SlashCmdList", "TickAll",

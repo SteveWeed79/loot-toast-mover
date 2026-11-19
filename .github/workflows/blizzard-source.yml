@@ -1,0 +1,69 @@
+name: Blizzard source check
+
+# Once a week, checks that what LootToastMover assumes about Blizzard's UI code is still
+# true in every game it ships for. It only reads: nothing is published and nothing in the
+# repository changes. When a check fails it opens an issue saying which assumption broke,
+# or adds to the one already open, so a game patch that needs a code change is noticed
+# before a player reports it.
+
+on:
+  schedule:
+    - cron: "0 14 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check:
+    name: ${{ matrix.game }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Keep in step with tools/check_blizzard_source.sh and tools/games.lua.
+        game: [live, forever, classic, classic_titan, classic_anniversary, classic_era]
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Check Blizzard's source
+        id: check
+        shell: bash
+        env:
+          WOW_GAME: ${{ matrix.game }}
+        run: |
+          {
+            echo "The weekly check of Blizzard's UI source failed for **${WOW_GAME}**."
+            echo 'Each failure below names what in LootToastMover rests on the fact that changed.'
+            echo
+            echo '```'
+          } > report.md
+
+          set +e
+          tools/check_blizzard_source.sh 2>&1 | tee -a report.md
+          status=${PIPESTATUS[0]}
+          set -e
+
+          echo '```' >> report.md
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+      # One issue per game while it stays broken, not one a week.
+      - name: Report
+        if: steps.check.outputs.status != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TITLE: "Blizzard changed something LootToastMover depends on (${{ matrix.game }})"
+        run: |
+          number=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "\"$TITLE\" in:title" --json number,title \
+            --jq "[.[] | select(.title == \"$TITLE\")][0].number // empty")
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body-file report.md
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body-file report.md
+          fi
+
+      - name: Fail the job
+        if: steps.check.outputs.status != '0'
+        run: exit 1

@@ -105,6 +105,18 @@ those never pass through the repository.
 | Option buttons widen for a long translation, and stay one width | German, French and Russian labels run longer than English, and must not spill past the button edges |
 | The CurseForge export reads back as exactly the strings it came from | `tools/upload_translations.sh` sends this export to CurseForge, so every phrase has to arrive intact, quotes and all |
 | The addon list description is translated too | The addon list is the first place a player sees the addon |
+| A damaged saved position falls back to the default instead of raising | A saved point or offset the game cannot use made `SetPoint` raise at every login and skipped the rest of the load handler |
+| Saved variables are checked once, at load | They used to be re-checked and re-migrated on every read, once a frame while dragging the minimap button |
+| An error inside the addon is contained, reported once and counted | Nothing was wrapped, so a fault in the layout hook raised inside Blizzard's alert code on every toast |
+| Slash commands, the compartment and the minimap button do not raise | The same, for what the player triggers |
+| Toasts stack upward unless asked, and the alert frames are left alone | With the option off the addon must not touch a single alert frame |
+| Stacking downward mirrors every link but the first | Blizzard's queue re-adds its point on every pass without clearing, so a mirrored frame must never be left holding both |
+| Turning stacking downward off puts every toast back at once | The toasts on screen must not wait for the next one to turn back |
+| Stacking downward moves only frames the alert system places itself | The loot-roll container and the talking head are positioned by something else |
+| The minimap button starts hidden only where there is an Addon Compartment | A new default must not take the button away from anyone who already has the addon |
+| The box appears with Edit Mode and goes with it | And must leave a box the player showed themselves alone |
+| Escape hides the box, and showing it says how to hide it | The box stayed until dismissed, with nothing saying how |
+| The sample toast needs the item loader as well as the alert system | `/ltm test` checked for one and not the other |
 | The stub rejects widget methods that do not exist | Guards the stub's own strictness; nothing else would notice it being relaxed |
 
 `check_toc.lua` separately verifies:

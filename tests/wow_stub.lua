@@ -57,17 +57,49 @@ Frame.__index = function(t, k)
         tostring(rawget(t, "_name") or "frame"), tostring(k)), 2)
 end
 
+-- The nine anchor points. The client raises on anything else, and on an offset that is not
+-- a number, which is what a damaged saved position turns into if nothing checks it first.
+local ANCHOR_POINTS = {
+    TOPLEFT = true, TOP = true, TOPRIGHT = true, LEFT = true, CENTER = true, RIGHT = true,
+    BOTTOMLEFT = true, BOTTOM = true, BOTTOMRIGHT = true,
+}
+
+-- A frame can carry several points at once, one per anchor point: setting a point it
+-- already has replaces that one, and setting a different one adds to them. Blizzard's alert
+-- queue relies on exactly that, re-setting BOTTOM on every pass without clearing first.
 function Frame:SetPoint(p, rel, rp, x, y)
     -- Both SetPoint("CENTER") and SetPoint("CENTER", rel, "CENTER", x, y) are legal.
-    if type(rel) == "string" then p, rel, rp, x, y = p, nil, rel, rp, x end
-    self._point = { p, rel, rp or p, x or 0, y or 0 }
+    -- So is SetPoint("TOP", 0, -10): a point and offsets, relative to the parent.
+    if type(rel) == "number" then
+        p, rel, rp, x, y = p, nil, nil, rel, rp
+    elseif type(rel) == "string" then
+        p, rel, rp, x, y = p, nil, rel, rp, x
+    end
+    rp = rp or p
+    if not (ANCHOR_POINTS[p] and ANCHOR_POINTS[rp]) then
+        error(("bad argument to 'SetPoint': %s / %s is not an anchor point"):format(
+            tostring(p), tostring(rp)), 2)
+    end
+    if (x ~= nil and (type(x) ~= "number" or x ~= x)) or (y ~= nil and (type(y) ~= "number" or y ~= y)) then
+        error("bad argument to 'SetPoint': offsets must be numbers", 2)
+    end
+    local point = { p, rel, rp, x or 0, y or 0 }
+    self._points = self._points or {}
+    for i, existing in ipairs(self._points) do
+        if existing[1] == p then
+            self._points[i] = point
+            return
+        end
+    end
+    table.insert(self._points, point)
 end
-function Frame:GetPoint()
-    local pt = self._point
+function Frame:GetNumPoints() return self._points and #self._points or 0 end
+function Frame:GetPoint(index)
+    local pt = self._points and self._points[index or 1]
     if not pt then return nil end
     return pt[1], pt[2], pt[3], pt[4], pt[5]
 end
-function Frame:ClearAllPoints() self._point = nil end
+function Frame:ClearAllPoints() self._points = nil end
 function Frame:SetSize(w, h) self._w, self._h = w, h end
 function Frame:SetWidth(w) self._w = w end
 function Frame:GetSize() return self._w or 0, self._h or 0 end
@@ -207,9 +239,124 @@ function M.reset()
             table.insert(_G.Settings.opened, id)
         end,
     }
+    -- Blizzard's alert layout, ported from AlertFrames.lua (the same in retail and the
+    -- Classic games): UpdateAnchors walks the subsystems, each anchors its frames to the
+    -- one before, and the last frame is what the next subsystem anchors to. The queue sets
+    -- BOTTOM-to-TOP, 10 apart, WITHOUT clearing the frame's other points; a frame that
+    -- places itself clears first and takes its points from the container's justification.
+    -- A frame the system only passes through is returned untouched.
+    _G.AlertFrame.alertFrameSubSystems = {}
     function _G.AlertFrame:UpdateAnchors()
         self._updateAnchorsCalls = (self._updateAnchorsCalls or 0) + 1
+        local relativeFrame = self
+        for _, system in ipairs(self.alertFrameSubSystems) do
+            relativeFrame = system:AdjustAnchors(relativeFrame)
+        end
     end
+    function _G.AlertFrame:GetPointsForJustification(relativeFrame)
+        if relativeFrame == self then return "BOTTOM", "BOTTOM" end
+        return "BOTTOM", "TOP"
+    end
+
+    _G.AlertFrameAutoAnchoredMixin = {}
+    function _G.AlertFrameAutoAnchoredMixin:AdjustAnchors(relativeAlert)
+        local frame = self.anchorFrame
+        if frame:IsShown() then
+            local point, relativePoint = _G.AlertFrame:GetPointsForJustification(relativeAlert)
+            frame:ClearAllPoints()
+            frame:SetPoint(point, relativeAlert, relativePoint, 0, 0)
+            return frame
+        end
+        return relativeAlert
+    end
+    _G.AlertFrameExternallyAnchoredMixin = {}
+    function _G.AlertFrameExternallyAnchoredMixin:AdjustAnchors(relativeAlert)
+        if self.anchorFrame:IsShown() then return self.anchorFrame end
+        return relativeAlert
+    end
+
+    --- A queued alert subsystem, like the one loot toasts go through. `frames` are its
+    --- active alerts, oldest first.
+    _G.AddAlertQueue = function()
+        local system = { frames = {} }
+        system.alertFramePool = {
+            EnumerateActive = function()
+                local i = 0
+                return function()
+                    i = i + 1
+                    return system.frames[i]
+                end
+            end,
+        }
+        function system:AdjustAnchors(relativeAlert)
+            for frame in self.alertFramePool:EnumerateActive() do
+                frame:SetPoint("BOTTOM", relativeAlert, "TOP", 0, 10)
+                relativeAlert = frame
+            end
+            return relativeAlert
+        end
+        --- Show one more alert, the way AddAlertFrame does: lay out, then show.
+        function system:Add(name)
+            local frame = setmetatable({ _name = name, _shown = true }, Frame)
+            table.insert(self.frames, frame)
+            _G.AlertFrame:UpdateAnchors()
+            return frame
+        end
+        --- An alert finished: the pool hides it and clears its anchors, then re-lays out.
+        function system:Release(frame)
+            for i, active in ipairs(self.frames) do
+                if active == frame then table.remove(self.frames, i) break end
+            end
+            frame:Hide()
+            frame:ClearAllPoints()
+            _G.AlertFrame:UpdateAnchors()
+        end
+        table.insert(_G.AlertFrame.alertFrameSubSystems, system)
+        return system
+    end
+    --- A single frame in the chain: "auto" places itself, "external" is placed elsewhere.
+    _G.AddAlertAnchorFrame = function(kind, name)
+        local frame = setmetatable({ _name = name, _shown = true }, Frame)
+        local mixin = kind == "auto" and _G.AlertFrameAutoAnchoredMixin
+            or _G.AlertFrameExternallyAnchoredMixin
+        local system = { anchorFrame = frame, AdjustAnchors = mixin.AdjustAnchors }
+        table.insert(_G.AlertFrame.alertFrameSubSystems, system)
+        return frame
+    end
+
+    -- Escape hides every shown frame named in this list (CloseSpecialWindows).
+    _G.UISpecialFrames = {}
+    _G.PressEscape = function()
+        for _, name in pairs(_G.UISpecialFrames) do
+            local frame = _G[name]
+            if frame and frame:IsShown() then frame:Hide() end
+        end
+    end
+
+    -- EventRegistry, as far as Edit Mode's two events: callbacks registered with an owner
+    -- are called with it first, as CallbackRegistryMixin does.
+    local callbacks = {}
+    _G.EventRegistry = {
+        RegisterCallback = function(_, event, fn, owner)
+            callbacks[event] = callbacks[event] or {}
+            table.insert(callbacks[event], { fn = fn, owner = owner })
+        end,
+        TriggerEvent = function(_, event, ...)
+            for _, callback in ipairs(callbacks[event] or {}) do
+                callback.fn(callback.owner, ...)
+            end
+        end,
+    }
+
+    -- The client's error handler, which BugSack and the like replace. Errors the addon
+    -- catches are handed here, so a test can see them.
+    _G.ERRORS = {}
+    _G.geterrorhandler = function()
+        return function(err) table.insert(_G.ERRORS, tostring(err)) end
+    end
+
+    -- Only retail and Forever have an Addon Compartment. Absent unless a test adds one.
+    _G.AddonCompartmentFrame = nil
 
     -- GameTooltip, as much of it as the Addon Compartment tooltip uses. Lines are captured
     -- so tests can assert on what the tooltip actually says.

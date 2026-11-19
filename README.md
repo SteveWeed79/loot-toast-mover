@@ -54,8 +54,15 @@ sitting exactly where the first one will appear. Drag it with the left mouse but
 what you see is where toasts land. Further toasts stack upward from it.
 
 `/ltm test` fires a genuine loot toast through Blizzard's alert system, so you can confirm
-the placement without waiting for a drop. Run `/ltm` again to hide the box when you are
-done.
+the placement without waiting for a drop. Run `/ltm` again, or press Escape, to hide the box
+when you are done.
+
+The box also appears on its own while Edit Mode is open, next to the rest of your UI, and
+goes when you close it.
+
+Toasts stack upward from the box, as Blizzard's always have. If you keep the box near the
+top of the screen, tick **Stack new toasts downward** in the options panel: the first toast
+still lands on the box and the rest hang below it instead of running off the top.
 
 ## Where to find it
 
@@ -63,8 +70,10 @@ The same three actions are reachable from four places, so the addon is visible h
 UI is set up:
 
 - **Minimap button** — the bag icon on the minimap ring. Left-click toggles the anchor box,
-  right-click opens the options panel, and dragging moves the button around the ring. Hide
-  it from the options panel or with `/ltm minimap`.
+  right-click opens the options panel, and dragging moves the button around the ring. Show
+  or hide it from the options panel or with `/ltm minimap`. A new install in retail or
+  Forever starts with it hidden, because the Addon Compartment there already lists the
+  addon; the Classic games show it.
 - **Options panel** — Game Menu → Options → AddOns → **LootToastMover**, with buttons for
   everything the slash commands do. `/ltm config` opens it directly.
 - **Broker plugin** — if you run a broker display (Titan Panel, Bazooka, ChocolateBar,
@@ -190,8 +199,12 @@ imports. Both scripts need the `CF_API_KEY` secret the release already uses.
 ## Saved variables
 
 `LootToastMoverDB` is account-wide and holds the anchor's screen position, the minimap
-button's placement under `minimapButton`, and a `schema` number used for upgrades.
-`/ltm reset` clears the position keys.
+button's placement under `minimapButton`, `growDown` for the stacking direction, and a
+`schema` number used for upgrades. `/ltm reset` clears the position keys.
+
+The table is checked once, when the addon loads. A position the game could not use (an
+anchor point that is not one, an offset that is not a number) is dropped and the box goes
+back to its default, rather than raising an error at every login.
 
 Two upgrades happen automatically on first load:
 
@@ -229,6 +242,25 @@ luacheck .                    # lint
 lua5.1 tests/run_tests.lua    # regression tests against a stubbed WoW API
 lua5.1 tests/check_toc.lua    # TOC and packaging sanity (see below)
 ```
+
+One more runs weekly instead, because it depends on Blizzard and not on this repository:
+
+```sh
+tools/check_blizzard_source.sh                        # retail
+WOW_GAME=classic_era tools/check_blizzard_source.sh   # any other game, by mirror branch
+```
+
+It reads Blizzard's UI source for one game and checks each fact the addon rests on: how
+alerts are anchored and stacked, the loot toast's 276×96 size, the Edit Mode events, the
+list Escape closes. The **Blizzard source check** workflow runs it for all six games every
+week and opens an issue naming what changed. It publishes nothing.
+
+### If something goes wrong in game
+
+Everything the game calls in the addon is wrapped. An error is passed to the game's error
+handler, so BugSack and similar addons record it, and is mentioned in chat once. After
+three in a session the addon stops reacting to Blizzard's alert layout until a `/reload`;
+slash commands and the options panel keep working. Saved settings are not touched.
 
 WoW runs Lua 5.1, so the tooling does too. See [tests/README.md](tests/README.md) for how
 the stub works and what each test guards against.

@@ -3,6 +3,35 @@
 Notable changes to LootToastMover. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [4.16.0] - 2026-11-19
+
+### Added
+
+- **Stack new toasts downward.** A new checkbox in the options panel. Toasts normally stack
+  upward from the anchor box, which runs a burst of them off the screen when the box is near
+  the top. Tick it and the first toast still lands on the box, and the rest hang below it.
+  Off by default, so nothing changes unless you ask.
+- **The anchor box appears in Edit Mode.** It shows when you open Edit Mode and goes when you
+  close it, alongside the rest of your UI. A box you had already shown is left alone.
+- **Escape hides the anchor box**, and showing it with `/ltm` or a click now says in chat how
+  to hide it again.
+- A bug-report form on GitHub.
+
+### Changed
+
+- **A new install starts without the minimap button in retail and Forever**, where the addon
+  is already listed in the Addon Compartment next to the minimap. `/ltm minimap` or the
+  options panel brings it back. If you already have the addon, your button stays as it is,
+  and the Classic games, which have no compartment, still show it.
+
+### Fixed
+
+- A damaged saved position no longer causes an error at every login. The box goes back to
+  its default position instead, and the rest of the addon still loads.
+- An error inside the addon is now caught, mentioned once in chat and passed to your error
+  addon, instead of interrupting Blizzard's alert code. After three in one session the addon
+  stops reacting to new toasts until you `/reload`.
+
 ## [4.15.1] - 2026-10-13
 
 ### Changed
